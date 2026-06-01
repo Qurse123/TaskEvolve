@@ -290,7 +290,7 @@ TAU2 Evaluator: db_check + action_checks + assertions -> reward 0.0–1.0
 observability/logger.py
   ├── experiments/logs/<run_id>/task_<id>.json   (full task record)
   ├── experiments/logs/<run_id>/run_summary.json  (updated after each task)
-  └── experiments/results.csv                     (append summary row after run)
+  └── experiments/results.csv                     (append summary row after run)  
 ```
 
 ---
