@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Cost-aware co-optimization of LLM agent harnesses on TAU2-bench"
 requires-python = ">=3.12"
 dependencies = [
+    "tau2[knowledge,gym]",
     "jinja2>=3.1",
     "langfuse>=2.0",
     "litellm>=1.40",
@@ -16,6 +17,9 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
 ]
+
+[tool.uv.sources]
+tau2 = { path = "vendor/tau2-bench", editable = true }
 
 [build-system]
 requires = ["hatchling"]
