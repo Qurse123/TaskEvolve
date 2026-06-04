@@ -16,8 +16,8 @@ import json
 import random
 from pathlib import Path
 
-from tau2.domains.mock.environment import get_tasks as get_mock_tasks  # type: ignore[import]
-from tau2.domains.retail.environment import get_tasks as get_retail_tasks  # type: ignore[import]
+from tau2.domains.mock.environment import get_tasks as get_mock_tasks
+from tau2.domains.retail.environment import get_tasks as get_retail_tasks
 
 SPLITS_DIR = Path(__file__).parent / "splits"
 
