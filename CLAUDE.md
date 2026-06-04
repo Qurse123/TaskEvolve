@@ -17,8 +17,8 @@ Build the harness, run the agent, get a baseline score. Nothing else. when readi
 - [x] `systems_design.md`
 - [x] `pyproject.toml` + `.env.example`
 - [x] `benchmark/splits.py` — generate smoke/proxy/validation split JSON files
-- [ ] `target_agent/agent.py` — `TaskEvolveAgent(HalfDuplexAgent)`
-- [ ] `target_agent/prompts/system_prompt.j2` — initial system prompt
+- [x] `target_agent/agent.py` — `TaskEvolveAgent(HalfDuplexAgent)`
+- [x] `target_agent/prompts/system_prompt.j2` — initial system prompt
 - [ ] `benchmark/adapter.py` — wrap TAU2's `run_single_task()`
 - [ ] `observability/langfuse_setup.py`
 - [ ] `observability/logger.py` — per-run folder JSON logs
@@ -31,7 +31,7 @@ Build the harness, run the agent, get a baseline score. Nothing else. when readi
 Install TAU2-bench (do this once):
 ```bash
 git clone https://github.com/sierra-research/tau2-bench vendor/tau2-bench
-cd vendor/tau2-bench && uv sync --all-extras
+cd vendor/tau2-bench && uv sync --extra knowledge --extra gym --extra dev
 ```
 
 ---
