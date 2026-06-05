@@ -58,17 +58,17 @@ TAU2-bench is the evaluation environment. We treat it as a frozen external depen
 **Installation:**
 ```bash
 git clone https://github.com/sierra-research/tau2-bench vendor/tau2-bench
-cd vendor/tau2-bench && uv sync --all-extras
+cd vendor/tau2-bench && uv sync --extra knowledge --extra gym --extra dev
 ```
 
-`--all-extras` installs voice, knowledge, gym, dev, and experiments extras. Required so our adapter has access to all domains and the dev tooling.
+We install the `knowledge`, `gym`, and `dev` extras. The `voice` extra is skipped — it needs the `portaudio` system library (via `pyaudio`) we do not require for half-duplex text runs.
 
-**Entry points we use:**
-- `tau2.runner.run_single_task(config, task, seed)` → `SimulationResult`
-- `tau2.runner.run_domain(config)` → `list[SimulationResult]`
-- `tau2.runner.build_environment(domain)` → `Environment`
-- `tau2.runner.get_tasks(domain, task_ids)` → `list[Task]`
-- `tau2.data_model.simulation.TextRunConfig` — run configuration
+**Entry points we use:** we do **not** call TAU2's `run_single_task()` / `run_domain()`, because those resolve the agent by name from TAU2's global registry and cannot accept an agent *instance*. Instead we construct the orchestrator ourselves and inject our agent (constructor injection), then hand it to TAU2's frozen evaluator:
+- `tau2.runner.build.build_environment(domain)` → `Environment`
+- `tau2.runner.build.build_user("user_simulator", env, task, …)` → user simulator instance
+- `tau2.orchestrator.orchestrator.Orchestrator(domain, agent, user, environment, task, …)` — we pass our `TaskEvolveAgent` **instance** here
+- `tau2.runner.simulation.run_simulation(orchestrator, evaluation_type=ALL)` → `SimulationRun` with `reward_info` attached (the frozen evaluator)
+- `tau2.data_model.simulation.TextRunConfig` — reference only; we read its field defaults from `tau2.config`
 
 **What TAU2-bench scores:**
 
@@ -228,18 +228,18 @@ Each task JSON:
   "harness_version": "v0.1",
   "agent_model": "gpt-4.1",
   "reward": 0.0,
+  "passed": false,
   "cost_usd": 0.14,
-  "input_tokens": 4200,
-  "output_tokens": 310,
-  "turn_count": 9,
-  "tool_calls": ["get_user_details", "cancel_order", "cancel_order"],
-  "failure_turn": 6,
-  "timestamp": "2026-05-29T10:32:00Z",
+  "termination_reason": "max_steps",
+  "seed": 300,
+  "timestamp": "2026-05-29T10:32:00+00:00",
   "run_id": "proxy_20260529_143022"
 }
 ```
 
-`run_summary.json` contains aggregate metrics for the run. `results.csv` appends one summary row per run. The iterator reads the most recent run folder for a given split to generate its feedback.
+The per-task JSON is **verdict-only** — reward, pass/fail, cost, and identity. Per-LLM-call telemetry (prompts, responses, token counts, latency, tool/retrieval steps) is **not** duplicated here; it lives in Langfuse and is correlated by `task_id` + `run_id`. This keeps our logs minimal and avoids re-deriving data the tracer already owns.
+
+`run_summary.json` contains aggregate metrics for the run. `results.csv` appends one summary row per run. The iterator reads the most recent run folder for a given split (plus Langfuse for call-level detail) to generate its feedback.
 
 ### 3.5 Iterator Agent (Milestone 2 Preview)
 
@@ -302,7 +302,11 @@ TaskEvolve/
 ├── systems_design.md          # this document
 ├── experiment.md              # research specification
 ├── pyproject.toml             # project dependencies
-├── .env.example               # required environment variables
+├── .env.example               # required environment variables (incl. AGENT_MODEL)
+│
+├── settings/                  # project-wide config (flat immutable constants)
+│   ├── __init__.py
+│   └── config.py              # AGENT_MODEL (from .env), PASS_THRESHOLD, DEFAULT_DOMAIN, MAX_STEPS…
 │
 ├── target_agent/              # EDITABLE surface (iterator can modify these)
 │   ├── __init__.py
@@ -316,7 +320,7 @@ TaskEvolve/
 │
 ├── benchmark/
 │   ├── __init__.py
-│   ├── adapter.py             # run_eval() wrapping TAU2's run_single_task
+│   ├── adapter.py             # run_eval() injects agent into TAU2 Orchestrator, runs run_simulation()
 │   ├── splits.py              # generates and loads split JSON files
 │   └── splits/
 │       ├── smoke.json         # 3 mock task IDs
@@ -352,7 +356,7 @@ TaskEvolve/
 3. `benchmark/splits.py` — generate and write split JSON files from TAU2-bench task lists
 4. `target_agent/agent.py` — minimal `TaskEvolveAgent` using TAU2's `generate()` utility
 5. `target_agent/prompts/system_prompt.j2` — initial agent system prompt (Jinja2)
-6. `benchmark/adapter.py` — thin wrapper around `run_single_task()` and `run_domain()`
+6. `benchmark/adapter.py` — `run_eval()` injects `TaskEvolveAgent` into TAU2's `Orchestrator`, runs `run_simulation()` (frozen evaluator), returns a verdict-only `EvalResult`
 7. `observability/langfuse_setup.py` — wire Langfuse before first run
 8. `observability/logger.py` — per-run folder JSON task log writer
 9. `scripts/run_smoke.py` — 3 mock tasks, end-to-end wiring check
@@ -364,7 +368,7 @@ TaskEvolve/
 Install TAU2-bench:
 ```bash
 git clone https://github.com/sierra-research/tau2-bench vendor/tau2-bench
-cd vendor/tau2-bench && uv sync --all-extras
+cd vendor/tau2-bench && uv sync --extra knowledge --extra gym --extra dev
 ```
 
 ---
@@ -375,7 +379,7 @@ cd vendor/tau2-bench && uv sync --all-extras
 
 OpenTelemetry is a distributed tracing standard for microservices. It requires a collector process, an OTLP exporter, and span context propagation across service boundaries.
 
-Our system is a single Python process. The iterator agent's feedback loop requires task-level structured data — which tool calls were made, which turn failed, what the reward was. TAU2-bench's `SimulationResult` already contains the full conversation and tool call trace. We augment it with our cost and turn metrics in a flat JSON file.
+Our system is a single Python process. The iterator agent's feedback loop needs two things at different grains: the per-task **verdict** (reward, pass/fail, cost) and per-call **telemetry** (which tool was called, which turn failed, the prompt/response). We split these by owner: the verdict goes to a flat per-task JSON file we write; the telemetry is owned by Langfuse, which TAU2's `run_simulation()` populates automatically. We do not copy Langfuse-owned data into our JSON.
 
 For LLM-call-level visibility (prompts, tokens, cost), **Langfuse** is purpose-built for this and TAU2-bench has native support via `USE_LANGFUSE=True`. It requires no infrastructure beyond `pip install langfuse` and a Langfuse API key.
 
