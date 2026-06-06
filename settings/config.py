@@ -33,6 +33,17 @@ USER_MODEL = os.environ.get("USER_MODEL")
 # Reward at or above which a task counts as a pass (design §3.3).
 PASS_THRESHOLD = 0.5
 
+# --- Observability ---
+# Whether to emit Langfuse traces. TAU2 hardcodes its own USE_LANGFUSE=False in
+# a frozen vendor file, so tracing reads THIS flag instead and wires the
+# LiteLLM -> Langfuse callback itself (see target_agent/traces/langfuse_setup.py).
+USE_LANGFUSE = os.environ.get("USE_LANGFUSE", "false").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+
 # --- Run defaults ---
 # Default TAU2 domain for proxy/validation splits; the smoke runner uses "mock".
 DEFAULT_DOMAIN = "retail"
