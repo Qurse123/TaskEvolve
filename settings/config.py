@@ -34,8 +34,9 @@ USER_MODEL = os.environ.get("USER_MODEL")
 PASS_THRESHOLD = 0.5
 
 # --- Observability ---
-# Whether to emit Langfuse traces. TaskEvolve reads this flag and wires the
-# LiteLLM -> Langfuse callback in target_agent/traces/langfuse_setup.py.
+# Whether to emit Langfuse traces. TAU2 hardcodes its own USE_LANGFUSE=False in
+# a frozen vendor file, so tracing reads THIS flag instead and wires the
+# LiteLLM -> Langfuse callback itself (see target_agent/traces/langfuse_setup.py).
 USE_LANGFUSE = os.environ.get("USE_LANGFUSE", "false").strip().lower() in {
     "1",
     "true",
