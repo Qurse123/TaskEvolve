@@ -20,9 +20,9 @@ Build the harness, run the agent, get a baseline score. Nothing else. when readi
 - [x] `target_agent/agent.py` — `TaskEvolveAgent(HalfDuplexAgent)`
 - [x] `target_agent/prompts/system_prompt.j2` — initial system prompt
 - [x] `benchmark/adapter.py` — inject `TaskEvolveAgent` into TAU2's `Orchestrator`, run via frozen `run_simulation()`
-- [x] `target_agent/traces/langfuse_setup.py` — Langfuse client + LiteLLM `langfuse_otel` callback (relocated from `observability/`)
+- [x] `target_agent/traces/langfuse_setup.py` — Langfuse client + LiteLLM `langfuse_otel` callback
 - [ ] **Generate split JSONs** — run `benchmark/splits.py` to populate `benchmark/splits/*.json` (currently empty)
-- [x] `observability/logger.py` — per-run folder JSON logs (start_run / log_task / finalize_run)
+- [x] `results/logger.py` — per-run folder JSON logs (start_run / log_task / finalize_run)
 - [ ] `DB/storage.py` — create results table with columns needed
 - [ ] `scripts/run_smoke.py` — 3 mock tasks, verify wiring at zero cost
 - [ ] **Run smoke test** ← gate before spending real money
