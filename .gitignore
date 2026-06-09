@@ -1,1 +1,4 @@
 .env
+
+# Derived artifact: SQLite mirror of experiments/results.csv (rebuilt via `python -m DB.storage`)
+experiments/results.db
