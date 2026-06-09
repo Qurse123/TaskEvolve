@@ -3,7 +3,7 @@
 Flow: build TAU2 environment and user -> inject TaskEvolveAgent into the
 Orchestrator -> run the simulation -> return a normalized EvalResult.
 
-This adapter does not write logs or CSV files; observability/logger.py owns
+This adapter does not write logs or CSV files; results/logger.py owns
 run-level persistence, while Langfuse captures per-LLM-call telemetry.
 """
 
