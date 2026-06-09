@@ -23,7 +23,7 @@ Build the harness, run the agent, get a baseline score. Nothing else. when readi
 - [x] `target_agent/traces/langfuse_setup.py` — Langfuse client + LiteLLM `langfuse_otel` callback
 - [ ] **Generate split JSONs** — run `benchmark/splits.py` to populate `benchmark/splits/*.json` (currently empty)
 - [x] `results/logger.py` — per-run folder JSON logs (start_run / log_task / finalize_run)
-- [ ] `DB/storage.py` — create results table with columns needed
+- [x] `DB/storage.py` — SQLite mirror of `results.csv` (`results` table keyed by `run_id`); sync via `python -m DB.storage`, open `experiments/results.db` in DBeaver. CSV stays canonical; DB is a regenerable query layer (no server — YAGNI for ~100 run-rows).
 - [ ] `scripts/run_smoke.py` — 3 mock tasks, verify wiring at zero cost
 - [ ] **Run smoke test** ← gate before spending real money
 - [ ] `scripts/run_train_eval.py` — proxy and validation runner (supports `--repeats N`; each repeat = one `results.csv` row, unique `run_id`)
