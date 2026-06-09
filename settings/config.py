@@ -43,6 +43,12 @@ USE_LANGFUSE = os.environ.get("USE_LANGFUSE", "false").strip().lower() in {
     "on",
 }
 
+# --- Harness ---
+# Version label for the editable harness surface (prompts, harness.py,
+# model_routing.py). Recorded in each task log so results trace to a harness
+# state. Bump when an accepted iterator change alters agent behavior.
+HARNESS_VERSION = "v0.1"
+
 # --- Run defaults ---
 # Default TAU2 domain for proxy/validation splits; the smoke runner uses "mock".
 DEFAULT_DOMAIN = "retail"
