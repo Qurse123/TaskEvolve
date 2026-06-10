@@ -184,9 +184,16 @@ The smoke test uses the **mock domain** where the user simulator is a simple rul
 
 Proxy and validation task IDs are generated once by `benchmark/splits.py` with a fixed random seed and written to `benchmark/splits/*.json`.
 
+**Milestone 1 repeat protocol:**
+- Smoke runs once. It is a wiring check, not a performance estimate.
+- Proxy baseline runs 5 times on the frozen 12-task proxy split with seeds `1001..1005`.
+- Validation baseline runs once as a blind post-hoc validation event, containing 5 repeats on the frozen 35-task validation split with seeds `2001..2005`.
+- TAU2 official test runs once at milestone end. It is not repeated or inspected during optimization.
+- Report proxy and validation baselines as mean ± standard deviation across repeated runs, with raw per-run rows preserved in `experiments/results.csv`.
+
 **Access control:**
 - **Iterator sees only proxy results** during optimization. It may never read validation or TAU2 test split results.
-- **Validation** runs exactly once after all optimization iterations are complete, as a post-hoc overfitting check.
+- **Validation** runs exactly once after all optimization iterations are complete, as a post-hoc overfitting check. "Once" means one validation event with the precommitted repeated run set above, not one stochastic task pass.
 - **TAU2 test split** runs exactly once at milestone end for final reporting via `scripts/run_tau_test.py`.
 
 **Transfer domain:** airline (held for Milestone 4+). After optimizing on retail, we measure cost-performance on airline and telecom with the same harness, un-modified — this directly tests whether improvements are domain-general or domain-specific.
@@ -213,7 +220,7 @@ experiments/
       task_retail_002.json
       ...
       run_summary.json
-    proxy_20260529_162511/       ← second run (different seed, for double-run validation)
+    proxy_20260529_162511/       ← second proxy run (different seed, for double-run confirmation)
       ...
   results.csv                    ← one row per run (aggregate metrics)
 ```
@@ -232,6 +239,10 @@ Each task JSON:
   "cost_usd": 0.14,
   "termination_reason": "max_steps",
   "seed": 300,
+  "latency_ms": 8421,
+  "turn_count": 8,
+  "tool_call_count": 5,
+  "invalid_action_count": 0,
   "timestamp": "2026-05-29T10:32:00+00:00",
   "run_id": "proxy_20260529_143022"
 }
@@ -252,11 +263,11 @@ The iterator is a separate Python process that:
 4. Validates against `allowed_edits.yaml` — rejects if the change touches frozen files
 5. Runs proxy eval (seed A) and checks if aggregate reward improved over current best
 6. If improved: runs proxy eval again (seed B) to confirm the gain is not noise
-7. If both runs show improvement: commits the change
-8. If either run does not show improvement (or drops success below the cost-floor threshold): reverts
+7. If both runs show improvement against the current proxy baseline distribution without crossing cost, policy, invalid-action, or latency guardrails: commits the change
+8. If either run does not show improvement (or crosses a guardrail): reverts
 9. Repeats until the optimization budget is exhausted
 
-**After all iterations:** run validation benchmark once to check for overfitting. If validation confirms gains held, run TAU2 official test split once for final reporting.
+**After all iterations:** run the validation benchmark once as a blind post-hoc event (`N=5`, seeds `2001..2005`) to check for overfitting. If validation confirms gains held, run TAU2 official test split once for final reporting.
 
 **The iterator never sees validation or test split results during optimization.** This is enforced structurally: the proxy runner and the validation/test runners are separate scripts with separate result directories, and `allowed_edits.yaml` cannot point to either.
 
@@ -360,11 +371,13 @@ TaskEvolve/
 6. `benchmark/adapter.py` — `run_eval()` injects `TaskEvolveAgent` into TAU2's `Orchestrator`, runs `run_simulation()` (frozen evaluator), returns a verdict-only `EvalResult`
 7. `target_agent/traces/langfuse_setup.py` — wire Langfuse (LiteLLM `langfuse_otel` callback) before first run
 8. `results/logger.py` — per-run folder JSON task log writer
-9. `scripts/run_smoke.py` — 3 mock tasks, end-to-end wiring check
-10. **Run smoke test** — confirm logs and Langfuse traces appear before spending real budget
-11. `scripts/run_train_eval.py` — proxy and validation runner
-12. **Run proxy baseline** (~$3, 12 tasks) — first real score (Arm A proxy baseline)
-13. **Run validation baseline** (~$10, 35 tasks) — official Arm A baseline
+9. Generate `benchmark/splits/*.json` once and freeze the task IDs before any paid benchmark run
+10. `scripts/run_smoke.py` — 3 mock tasks, end-to-end wiring check
+11. **Run smoke test** — confirm logs and Langfuse traces appear before spending real budget
+12. `scripts/run_train_eval.py` — proxy and validation runner with `--repeats N --seed-start S`
+13. **Run proxy baseline ×5** (~$15 total, 12 tasks × 5 seeds `1001..1005`) — first real Arm A proxy distribution
+14. **Run validation baseline ×5 once, post-hoc** (~$50 total, 35 tasks × 5 seeds `2001..2005`) — official Arm A validation distribution
+15. `scripts/plot_results.py` — graph mean ± std and cost-vs-success Pareto from `experiments/results.csv`
 
 Install TAU2-bench:
 ```bash
@@ -390,7 +403,7 @@ OpenTelemetry would add operational complexity — a collector, an exporter sink
 
 Running all 115 retail tasks costs ~$28 per run (agent + user simulator both call GPT-4o, average 12 turns per task). At 50 iterator iterations that is $1,400 in eval costs before counting the iterator agent's own model calls.
 
-The proxy set (12 tasks, ~$3/run) gives sufficient signal to detect whether a system prompt change helps or hurts. Validation runs only post-hoc after all optimization is complete, not per-iteration. This reduces expected cost per iteration from $28 to $3–6 (proxy once or twice for the double-run check).
+The proxy set (12 tasks, ~$3/run) gives sufficient signal to detect whether a system prompt change helps or hurts. Validation runs only post-hoc after all optimization is complete, not per-iteration. This reduces expected cost per iteration from $28 to $3–6 (proxy once or twice for the double-run check). Baselines are still repeated because the benchmark is stochastic: Milestone 1 fixes `N=5` for proxy and validation baselines so reported numbers are distributions, not single samples.
 
 ### 7.3 Why Three Evaluation Splits, Not Two
 
@@ -398,7 +411,7 @@ The "two test suites" framing conflates three distinct needs:
 
 - **Smoke test** — Does the harness produce any output? Tests wiring, not task performance. Uses the mock domain where the user simulator costs nothing. Three tasks is enough.
 - **Proxy** (seen by iterator) — Generates optimization signal. The iterator trains against this.
-- **Validation** (never seen during optimization) — Runs once post-hoc to check for overfitting. If the iterator ever observes validation results during optimization, the generalization claims become invalid.
+- **Validation** (never seen during optimization) — Runs once post-hoc to check for overfitting. The single validation event contains the precommitted repeated seed set so we can report mean ± std without letting the iterator train on validation feedback. If the iterator ever observes validation results during optimization, the generalization claims become invalid.
 
 Conflating proxy and smoke wastes API budget on wiring checks that cost nothing on mock. Conflating validation and proxy invalidates the experiment by letting the iterator overfit to validation signal.
 

@@ -21,17 +21,17 @@ Build the harness, run the agent, get a baseline score. Nothing else. when readi
 - [x] `target_agent/prompts/system_prompt.j2` — initial system prompt
 - [x] `benchmark/adapter.py` — inject `TaskEvolveAgent` into TAU2's `Orchestrator`, run via frozen `run_simulation()`
 - [x] `target_agent/traces/langfuse_setup.py` — Langfuse client + LiteLLM `langfuse_otel` callback
-- [ ] **Generate split JSONs** — run `benchmark/splits.py` to populate `benchmark/splits/*.json` (currently empty)
+- [x] **Generate split JSONs** — `benchmark/splits/{smoke,proxy,validation}.json` written (3 mock / 12 + 35 retail-train, seed 42; proxy⟂validation disjoint). Now frozen.
 - [x] `results/logger.py` — per-run folder JSON logs (start_run / log_task / finalize_run)
 - [x] `DB/storage.py` — SQLite mirror of `results.csv` (`results` table keyed by `run_id`); sync via `python -m DB.storage`, open `experiments/results.db` in DBeaver. CSV stays canonical; DB is a regenerable query layer (no server — YAGNI for ~100 run-rows).
 - [ ] `scripts/run_smoke.py` — 3 mock tasks, verify wiring at zero cost
 - [ ] **Run smoke test** ← gate before spending real money
-- [ ] `scripts/run_train_eval.py` — proxy and validation runner (supports `--repeats N`; each repeat = one `results.csv` row, unique `run_id`)
-- [ ] **Run proxy baseline ×N** (~$3/run, 12 tasks) — repeat N times (e.g. 5) for an Arm A variance band, not a single point
-- [ ] **Run validation baseline ×N** (~$10/run, 35 tasks) — repeat for variance; official Arm A number is the **mean ± std** across repeats
+- [ ] `scripts/run_train_eval.py` — proxy and validation runner (supports `--repeats N --seed-start S`; each repeat = one `results.csv` row, unique `run_id`)
+- [ ] **Run proxy baseline ×5** (~$15 total, 12 tasks × 5 seeds) — fixed Milestone 1 seed schedule: `1001..1005`; Arm A proxy baseline is **mean ± std**, not a single point
+- [ ] **Run validation baseline ×5 once, post-hoc** (~$50 total, 35 tasks × 5 seeds) — fixed Milestone 1 seed schedule: `2001..2005`; official Arm A validation number is **mean ± std** across repeats
 - [ ] `scripts/plot_results.py` — visualizer reading `experiments/results.csv`: group by (`split`, `harness_version`), show baseline spread across the N repeats + cost-vs-success Pareto (experiment.md §25). Build once the baseline repeats exist; Langfuse covers live per-call cost until then.
 
-> **Baseline = a distribution, not one run.** The benchmark is stochastic (LLM user-sim; OpenAI non-determinism even at temp 0), so every baseline and every accepted change is measured as mean ± std over N runs. The per-run-row `results.csv` already supports this — no schema change, just group rows.
+> **Baseline = a distribution, not one run.** Milestone 1 uses `N=5` as the precommitted minimum repeat count. The benchmark is stochastic (LLM user-sim; OpenAI non-determinism even at temp 0), so every baseline is measured as mean ± std over fixed seeds. The per-run-row `results.csv` already supports this — no schema change, just group rows.
 
 Install TAU2-bench (do this once):
 ```bash
@@ -62,9 +62,9 @@ The iterator can modify exactly these files — nothing else:
 3. **Frozen surfaces (iterator and humans alike):**
    - `vendor/tau2-bench/` — everything in here
    - `benchmark/splits/*.json` — task IDs are fixed at generation time
-4. **Validation runs once**, post-hoc, after all iterations complete.
+4. **Validation runs once as a blind post-hoc event**, after all iterations complete. That event contains the precommitted repeated run set (`N=5`, seeds `2001..2005`); the iterator never sees these logs during optimization.
 5. **TAU2 test split runs once**, at milestone end, via `scripts/run_tau_test.py`.
-6. **Double-run rule:** before committing a change, the iterator must run proxy eval twice (different seeds). Both must show improvement.
+6. **Double-run rule:** before committing a change, the iterator must run proxy eval twice with different, logged seeds. Both must show improvement against the current best proxy distribution without crossing cost, policy, invalid-action, or latency guardrails.
 
 ---
 

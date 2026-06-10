@@ -520,15 +520,17 @@ This is the main research contribution of the full paper.
 
 ## 14. Milestone Plan
 
-### 14.1 Milestone 1: Arm A and Arm B
+### 14.1 Milestone 1: Arm A Baseline
 
 Goal:
 
-Build the τ-bench adapter, static harness baseline, iterator loop, logging, and keep/revert mechanism.
+Build the τ-bench adapter, static harness baseline, split generation, logging, and repeated baseline runner.
 
 Question:
 
-Can the iterator agent improve the harness when the model is fixed?
+What is the closed-weight static-harness baseline distribution under the fixed evaluation protocol?
+
+Arm B starts only after the Arm A baseline is reproducible and reviewed.
 
 ### 14.2 Milestone 2: Arm C and Arm D
 
@@ -620,21 +622,36 @@ Do not use `val_bpb` unless the experiment is literally training a language mode
 
 For this experiment, task-level and cost-level metrics are required.
 
+### 15.5 Statistical Reporting Protocol
+
+The benchmark is stochastic because the user simulator and task-performing agent use LLM calls. A single run is not a valid estimate of baseline quality.
+
+For Milestone 1, the precommitted repeat protocol is:
+
+1. Smoke split: run once. It is a wiring check only.
+2. Proxy baseline: run 5 repeats with seeds `1001..1005`.
+3. Validation baseline: run one blind post-hoc validation event with 5 repeats and seeds `2001..2005`.
+4. TAU2 official hidden test: run once at milestone end.
+
+Report proxy and validation numbers as mean ± standard deviation across repeated runs, and keep the raw per-run rows in `experiments/results.csv`. Do not choose `N`, seeds, or task subsets after looking at results.
+
 ## 16. Dataset Splits
 
 The benchmark should be split into four evaluation groups.
 
 ### 16.1 Train Set
 
-The iterator agent may optimize against this set.
+The iterator agent may optimize against this set. In this repo, the operational train subset is called the **proxy** split.
 
 The train set is used to discover candidate harness and model-specialization improvements.
 
 ### 16.2 Validation Set
 
-The validation set is used to decide whether a candidate system change should be kept.
+The validation set is used to check whether the final candidate system generalizes beyond the proxy split.
 
-A change should not be accepted solely because it improves the train set.
+For the cost-controlled TaskEvolve protocol, validation is not exposed to the iterator during optimization and is not run after every candidate change. It runs once as a blind post-hoc validation event after the optimization budget is exhausted. That event may contain repeated stochastic runs for measurement precision, but it remains one validation event for access-control purposes.
+
+A final system should not be claimed as improved solely because it improves the proxy split.
 
 ### 16.3 Hidden Test Set
 
@@ -663,7 +680,7 @@ The experiment must reduce overfitting through the following controls:
 4. The iterator agent cannot edit the user simulator.
 5. The iterator agent cannot edit the domain database.
 6. The iterator agent cannot see hidden test results.
-7. The iterator agent must optimize on train and be selected on validation.
+7. The iterator agent must optimize only on the proxy/train subset; the final candidate is checked once on blind validation after the optimization budget is exhausted.
 8. The final test must be run once.
 9. The optimization budget must be fixed before the experiment starts.
 10. Each experimental arm must receive the same budget class.
@@ -777,7 +794,7 @@ A change is accepted only if it improves the objective without violating constra
 
 For performance-first arms, a change may be accepted if:
 
-1. It improves validation task success.
+1. It improves the proxy objective under the precommitted repeated-run rule.
 2. It does not cause unacceptable regression in policy compliance.
 3. It does not cause unacceptable cost or latency inflation.
 
@@ -790,8 +807,8 @@ For cost-aware arms, a change may be accepted if:
 
 A change is rejected if:
 
-1. Train improves but validation regresses.
-2. Validation improves only through unacceptable cost increase.
+1. The proxy double-run does not improve against the current best proxy distribution.
+2. Apparent improvement comes only through unacceptable cost increase.
 3. Cost decreases only by sacrificing required task success.
 4. The change increases invalid output rate.
 5. The change breaks the harness.
@@ -800,25 +817,28 @@ A change is rejected if:
 8. The change creates benchmark-specific hacks.
 9. The change depends on memorized task IDs or task-specific shortcuts.
 
+After optimization ends, the final candidate is checked on the blind validation event. If validation fails to preserve the proxy gain within the precommitted guardrails, the final report must describe the system as proxy-overfit rather than as a validated improvement.
+
 ## 21. Iteration Protocol
 
 Each iteration follows this loop:
 
-1. Run current system on train subset.
-2. Run current system on validation subset.
-3. Store task success, policy compliance, cost, latency, turn count, tool-call count, and failure logs.
-4. Iterator agent reads only allowed logs and allowed source files.
-5. Iterator agent proposes one change.
-6. System checks whether the change touches only allowed files.
-7. If the change is invalid, reject immediately.
-8. If valid, apply the change.
-9. Rerun train and validation evaluation.
-10. Compare against the previous best system.
-11. Keep or revert the change.
-12. Write an experiment note.
-13. Commit accepted changes.
-14. Log rejected changes.
-15. Continue until budget is exhausted.
+1. Run or load the current best proxy distribution.
+2. Iterator agent reads only proxy logs, proxy-linked Langfuse traces, and allowed source files.
+3. Iterator agent proposes exactly one meaningful change.
+4. System checks whether the change touches only allowed files.
+5. If the change is invalid, reject immediately.
+6. If valid, apply the change.
+7. Run proxy eval once with a new logged seed.
+8. If the first proxy run improves, run proxy eval again with a different logged seed.
+9. Keep the change only if both proxy runs improve against the current best proxy distribution without crossing task success, policy compliance, invalid-action, latency, or cost guardrails.
+10. Revert the change if either proxy run fails the rule.
+11. Write an experiment note.
+12. Commit accepted changes.
+13. Log rejected changes.
+14. Continue until the fixed optimization budget is exhausted.
+15. Run validation once as a blind post-hoc event with the precommitted repeated seed set.
+16. Run the hidden test once at milestone end, and report it conservatively even if validation exposes overfitting.
 
 ## 22. Experiment Logging
 
@@ -840,10 +860,17 @@ changed_surface
 changed_file
 change_summary
 reason_for_change
-train_task_success_before
-train_task_success_after
-validation_task_success_before
-validation_task_success_after
+proxy_repeat_count
+proxy_seeds
+proxy_task_success_before_mean
+proxy_task_success_before_std
+proxy_task_success_after_mean
+proxy_task_success_after_std
+validation_event_id
+validation_repeat_count
+validation_seeds
+validation_task_success_mean
+validation_task_success_std
 policy_compliance_before
 policy_compliance_after
 tool_call_correctness_before
@@ -877,10 +904,10 @@ cost-aware-agent-cooptimization/
   benchmark/
     tau_bench_adapter/
     splits/
-      train.jsonl
-      validation.jsonl
-      hidden_test.jsonl
-      transfer.jsonl
+      proxy.json
+      validation.json
+      tau_test.json
+      transfer.json
 
   target_agent/
     agent.py
@@ -929,9 +956,9 @@ cost-aware-agent-cooptimization/
     graphs/
 
   scripts/
-    run_baseline.py
-    run_validation.py
-    run_hidden_test.py
+    run_smoke.py
+    run_train_eval.py
+    run_tau_test.py
     run_transfer.py
     plot_results.py
 ```
@@ -939,6 +966,17 @@ cost-aware-agent-cooptimization/
 ## 24. Success Criteria
 
 ### 24.1 Milestone 1 Success Criteria
+
+Milestone 1 is successful if:
+
+1. Frozen split JSON files exist for smoke, proxy, and validation.
+2. Smoke passes once and produces logs/traces without paid benchmark spend.
+3. Arm A proxy baseline runs `N=5` with seeds `1001..1005`.
+4. Arm A validation baseline runs as one blind post-hoc event with `N=5` and seeds `2001..2005`.
+5. Results are reported as mean ± standard deviation with raw per-run rows.
+6. Logs include task success, policy compliance, cost, latency, turns, tool calls, invalid actions, model, split, seed, and run ID.
+
+### 24.2 Arm B Success Criteria
 
 Arm B is successful relative to Arm A if:
 
@@ -948,7 +986,7 @@ Arm B is successful relative to Arm A if:
 4. The iterator agent discovers at least one reusable harness improvement.
 5. The system produces interpretable experiment logs.
 
-### 24.2 Milestone 2 Success Criteria
+### 24.3 Milestone 2 Success Criteria
 
 Arm D is successful relative to Arm C if:
 
@@ -956,7 +994,7 @@ Arm D is successful relative to Arm C if:
 2. The specialized model reduces cost relative to the closed-weight baseline or improves the cost-performance tradeoff.
 3. The gains are not limited to the train set.
 
-### 24.3 Milestone 3 Success Criteria
+### 24.4 Milestone 3 Success Criteria
 
 Arm E is successful if:
 
@@ -964,7 +1002,7 @@ Arm E is successful if:
 2. The hybrid system improves cost per successful task compared to the closed-weight baseline.
 3. The hybrid system does not collapse on held-out or transfer tasks.
 
-### 24.4 Milestone 4 Success Criteria
+### 24.5 Milestone 4 Success Criteria
 
 Arm F is successful if:
 
