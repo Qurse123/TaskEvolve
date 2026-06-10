@@ -9,5 +9,6 @@ vendor/
 
 # Run artifacts (regenerable; official numbers live in docs)
 experiments/logs/
+experiments/plots/
 experiments/results.csv
 experiments/*.db
