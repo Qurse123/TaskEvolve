@@ -24,8 +24,8 @@ Build the harness, run the agent, get a baseline score. Nothing else. when readi
 - [x] **Generate split JSONs** — `benchmark/splits/{smoke,proxy,validation}.json` written (3 mock / 12 + 35 retail-train, seed 42; proxy⟂validation disjoint). Now frozen.
 - [x] `results/logger.py` — per-run folder JSON logs (start_run / log_task / finalize_run)
 - [x] `DB/storage.py` — SQLite mirror of `results.csv` (`results` table keyed by `run_id`); sync via `python -m DB.storage`, open `experiments/results.db` in DBeaver. CSV stays canonical; DB is a regenerable query layer (no server — YAGNI for ~100 run-rows).
-- [ ] `scripts/run_smoke.py` — 3 mock tasks, verify wiring at zero cost
-- [ ] **Run smoke test** ← gate before spending real money
+- [x] `scripts/run_smoke.py` — 3 mock tasks, verify wiring at zero cost (built; imports + split-load verified at $0). Run via `python -m scripts.run_smoke`.
+- [x] **Run smoke test** ← PASSED 3/3 (mock domain, ~$0.009 total). Full chain verified: splits → agent → orchestrator → evaluator → results logger (JSON+CSV) → SQLite mirror. cost_per_successful_task flowing.
 - [ ] `scripts/run_train_eval.py` — proxy and validation runner (supports `--repeats N --seed-start S`; each repeat = one `results.csv` row, unique `run_id`)
 - [ ] **Run proxy baseline ×5** (~$15 total, 12 tasks × 5 seeds) — fixed Milestone 1 seed schedule: `1001..1005`; Arm A proxy baseline is **mean ± std**, not a single point
 - [ ] **Run validation baseline ×5 once, post-hoc** (~$50 total, 35 tasks × 5 seeds) — fixed Milestone 1 seed schedule: `2001..2005`; official Arm A validation number is **mean ± std** across repeats
@@ -52,6 +52,10 @@ The iterator can modify exactly these files — nothing else:
 | `target_agent/prompts/few_shot_examples.j2` | Example conversations (empty in M1) |
 | `target_agent/harness.py` | History compression, tool filtering |
 | `target_agent/model_routing.py` | Model selection (gpt-4.1 vs gpt-4.1-mini) |
+
+### Deferred to M2 (iterator build)
+
+- [ ] **Proper GENERATION traces + task/run grouping in Langfuse.** M1 uses LiteLLM's `langfuse_otel` callback (the only one compatible with Langfuse v4 — the native `"langfuse"` callback needs the removed v2 `langfuse.model`/`langfuse.client` APIs). OTEL spans get typed as `TOOL`/`SPAN` named `litellm_request`, so the dashboard's Generations view + per-model token/cost rollups look empty. The data is still captured (trace-level cost, token usage) and queryable via the REST API, and the headline `cost_per_successful_task` comes from TAU2's accounting in `results.csv`, not Langfuse — so M1 is unaffected. **Fix when building the iterator:** wrap the agent's LiteLLM call in a Langfuse v4 `start_as_current_generation()` (in `target_agent/`) and attach `task_id` + `run_id` metadata. This yields proper GENERATION observations *and* groups traces per task/run so the iterator can slice cost by task/model. (Do **not** downgrade to langfuse v2 to get the native callback.)
 
 ---
 
