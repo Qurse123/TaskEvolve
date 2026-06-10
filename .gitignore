@@ -1,4 +1,13 @@
 .env
 
-# Derived artifact: SQLite mirror of experiments/results.csv (rebuilt via `python -m DB.storage`)
-experiments/results.db
+# Python build artifacts
+__pycache__/
+*.pyc
+
+# Vendored external dependency (cloned + built locally, never committed)
+vendor/
+
+# Run artifacts (regenerable; official numbers live in docs)
+experiments/logs/
+experiments/results.csv
+experiments/*.db
