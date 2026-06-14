@@ -38,7 +38,7 @@ Build the harness, run the agent, get a baseline score. Nothing else. when readi
 Install TAU2-bench (do this once):
 ```bash
 git clone https://github.com/sierra-research/tau2-bench vendor/tau2-bench
-cd vendor/tau2-bench && uv sync --extra knowledge --extra gym --extra dev
+cd vendor/tau2-bench && uv sync --extra knowledge --extra gym --extra dev     
 ```
 
 ---
