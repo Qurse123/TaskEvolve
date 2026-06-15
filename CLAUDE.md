@@ -23,7 +23,7 @@ Build the harness, run the agent, get a baseline score. Nothing else. when readi
 - [x] `target_agent/traces/langfuse_setup.py` — Langfuse client + LiteLLM `langfuse_otel` callback
 - [x] **Generate split JSONs** — `benchmark/splits/{smoke,proxy,validation}.json` written (3 mock / 12 + 35 retail-train, seed 42; proxy⟂validation disjoint). Now frozen.
 - [x] `results/logger.py` — per-run folder JSON logs (start_run / log_task / finalize_run)
-- [x] `DB/storage.py` — SQLite mirror of `results.csv` (`results` table keyed by `run_id`); sync via `python -m DB.storage`, open `experiments/results.db` in DBeaver. CSV stays canonical; DB is a regenerable query layer (no server — YAGNI for ~100 run-rows).
+- [x] `DB/storage.py` — SQLite mirror of `results.csv` (`results` table keyed by `run_id`); sync via `python -m DB.storage`, open `experiments/results.db` in DBeaver. CSV stays canonical; DB is a regenerable query layer (no server — YAGNI for ~100 run-rows).      
 - [x] `scripts/run_smoke.py` — 3 mock tasks, verify wiring at zero cost (built; imports + split-load verified at $0). Run via `python -m scripts.run_smoke`.
 - [x] **Run smoke test** ← PASSED 3/3 (mock domain, ~$0.009 total). Full chain verified: splits → agent → orchestrator → evaluator → results logger (JSON+CSV) → SQLite mirror. cost_per_successful_task flowing.
 - [x] `scripts/run_train_eval.py` — proxy/validation runner (`--split --seed-start S --repeats N`; each repeat = one `results.csv` row; prints mean ± std). Built + verified at $0 (helpers, split-load, arg-validation). Run: `python -m scripts.run_train_eval --split proxy --repeats 5 --seed-start 1001`.
