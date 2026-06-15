@@ -21,7 +21,9 @@ from __future__ import annotations
 import argparse
 import logging
 import statistics
+import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import List, Optional, Sequence
 
 from benchmark.adapter import EvalResult, run_eval
@@ -73,14 +75,87 @@ def run_repeats(
     return metrics
 
 
+# A task that errors out is retried on transient provider/network hiccups, then
+# (if still failing) recorded as a failed result so one bad task can't abort the
+# whole one-shot run. Markers are matched against the exception class *name* to
+# avoid a hard dependency on provider-specific exception types.
+TRANSIENT_ERROR_MARKERS = (
+    "RateLimit", "Timeout", "APIConnection", "ServiceUnavailable",
+    "InternalServerError", "Overloaded", "APIError",
+)
+MAX_TASK_RETRIES = 5
+RETRY_BASE_DELAY_S = 5.0
+RETRY_MAX_DELAY_S = 60.0
+
+
+def _is_transient(exc: BaseException) -> bool:
+    """True if the exception looks like a retryable provider/network hiccup."""
+    name = type(exc).__name__
+    return any(marker in name for marker in TRANSIENT_ERROR_MARKERS)
+
+
+def _run_task_with_retries(
+    task_id: str, *, split: str, domain: str, seed: int
+) -> EvalResult:
+    """Run one task, retrying transient errors with exponential backoff.
+
+    Re-raises the last error if retries are exhausted or the error is not transient.
+    """
+    attempt = 0
+    while True:
+        try:
+            return run_eval(task_id, split=split, domain=domain, seed=seed)
+        except Exception as exc:  # noqa: BLE001 - classify, then retry or re-raise
+            if not _is_transient(exc) or attempt >= MAX_TASK_RETRIES:
+                raise
+            delay = min(RETRY_BASE_DELAY_S * (2 ** attempt), RETRY_MAX_DELAY_S)
+            logger.warning(
+                "  task %s (seed=%d) transient error (attempt %d/%d): %s; retrying in %.0fs",
+                task_id, seed, attempt + 1, MAX_TASK_RETRIES, exc, delay,
+            )
+            time.sleep(delay)
+            attempt += 1
+
+
+def _failed_result(
+    task_id: str, *, split: str, domain: str, seed: int, error: BaseException
+) -> EvalResult:
+    """An EvalResult marking a task that could not complete (counts as a failure)."""
+    return EvalResult(
+        task_id=task_id,
+        domain=domain,
+        split=split,
+        agent_model=config.AGENT_MODEL or "unknown",
+        reward=0.0,
+        passed=False,
+        agent_cost=None,
+        termination_reason=f"harness_error: {type(error).__name__}: {error}",
+        seed=seed,
+        timestamp=datetime.now(timezone.utc).isoformat(),
+    )
+
+
 def _run_one_repeat(
     split: str, task_ids: Sequence[str], *, domain: str, seed: int
 ) -> RepeatMetrics:
-    """Run every task once at ``seed``, log the run, return its headline metrics."""
+    """Run every task once at ``seed``, log the run, return its headline metrics.
+
+    A task that errors out (after retries on transient errors) is recorded as a
+    failed result rather than aborting the whole run — important for the one-shot
+    validation event, and honest for the metric (an un-completable task counts as
+    a failure, not a dropped sample).
+    """
     run = start_run(split)
     results: List[EvalResult] = []
     for task_id in task_ids:
-        result = run_eval(task_id, split=split, domain=domain, seed=seed)
+        try:
+            result = _run_task_with_retries(task_id, split=split, domain=domain, seed=seed)
+        except Exception as exc:  # noqa: BLE001 - keep the batch alive; record as failure
+            logger.exception(
+                "  task %s (seed=%d) failed permanently; recording as failure: %s",
+                task_id, seed, exc,
+            )
+            result = _failed_result(task_id, split=split, domain=domain, seed=seed, error=exc)
         log_task(run, result)
         results.append(result)
     finalize_run(run, results)
