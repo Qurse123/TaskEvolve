@@ -1063,6 +1063,16 @@ Identify Pareto-optimal systems.
 
 A system is better if it is up and to the left: higher success, lower cost.
 
+Plotting convention: each run is one point and each arm a cloud of its repeated
+seeds, with the arm mean drawn as a marker carrying x/y std error bars. Axes
+auto-zoom to the data range (with margin) so tightly-clustered arms stay legible;
+origin-anchoring is an explicit option (`--from-zero`) for iso-cost-per-success
+reading. A Pareto frontier requires ≥2 arms — there is nothing to trade against
+otherwise — so a single arm (e.g. the Arm A baseline alone) is instead shown as a
+**per-metric distribution**: one dot-plot panel per headline metric (task success
+rate, cost per successful task), each panel showing the raw seeds plus mean ± std.
+That spread is the noise floor a later arm must beat on the proxy double-run.
+
 ### 25.4 Policy Compliance vs Cost
 
 X-axis:

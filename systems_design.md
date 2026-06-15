@@ -377,7 +377,9 @@ TaskEvolve/
 12. `scripts/run_train_eval.py` — proxy and validation runner with `--repeats N --seed-start S`
 13. **Run proxy baseline ×5** (~$15 total, 12 tasks × 5 seeds `1001..1005`) — first real Arm A proxy distribution
 14. **Run validation baseline ×5 once, post-hoc** (~$50 total, 35 tasks × 5 seeds `2001..2005`) — official Arm A validation distribution
-15. `scripts/plot_results.py` — graph mean ± std and cost-vs-success Pareto from `experiments/results.csv`
+15. `scripts/plot_results.py` — render baseline results from `experiments/results.csv` in two modes:
+    - **Per-metric dot plot** (default for a single arm): one panel per headline metric (task success rate, cost per successful task); each seed is a dot with the arm's mean ± std overlaid. A Pareto frontier needs ≥2 arms, so a single arm is shown as a distribution, not a frontier.
+    - **Cost-vs-success frontier scatter** (default once ≥2 arms exist; force with `--frontier`): each run is a point, each arm a cloud, the arm mean drawn as a marker with x/y std error bars. Axes auto-zoom to the data range so tightly-clustered arms stay legible; `--from-zero` anchors at the origin for iso-cost-per-success reading.
 
 Install TAU2-bench:
 ```bash
