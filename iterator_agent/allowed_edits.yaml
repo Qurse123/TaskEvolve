@@ -1,0 +1,40 @@
+# Edit guard allow-list for the iterator agent.
+#
+# The iterator may edit ONLY the files in `allowed_paths`. Every other path is
+# rejected by iterator_agent/edit_guard.py BEFORE any change is applied. Paths
+# under a `forbidden_paths` prefix are rejected with an explicit "frozen" reason
+# (defense-in-depth + clearer errors). This file is itself frozen — the iterator
+# cannot edit its own allow-list.
+#
+# Paths are repo-root-relative POSIX paths. See CLAUDE.md "Iterator Edit Surface"
+# and experiment.md §19.
+
+allowed_paths:
+  - target_agent/prompts/system_prompt.j2
+  - target_agent/prompts/policy_summary.j2
+  - target_agent/prompts/few_shot_examples.j2
+  - target_agent/harness.py
+  - target_agent/model_routing.py
+
+forbidden_paths:
+  # The frozen TAU2 benchmark (evaluator, user sim, domain DB, orchestrator).
+  - vendor/tau2-bench/
+  # Frozen task-ID splits.
+  - benchmark/splits/
+  # Benchmark adapter + results ledger are owned by the harness, not the iterator.
+  - benchmark/adapter.py
+  - results/
+  # The iterator may not edit its own guard or allow-list.
+  - iterator_agent/allowed_edits.yaml
+  - iterator_agent/edit_guard.py
+
+# Acceptance guardrails — declared here, consumed later by
+# iterator_agent/acceptance.py (NOT by edit_guard.py). The iterator may not
+# modify these mid-run.
+guardrails:
+  # A change must keep proxy task success at or above this fraction of the
+  # current-best proxy mean (experiment.md §11.2 example: 0.95).
+  task_success_floor_frac_of_best: 0.95
+  # Cost / quality ceilings; null = declared but not yet enforced.
+  max_cost_per_successful_task_usd: null
+  max_invalid_action_rate: null
