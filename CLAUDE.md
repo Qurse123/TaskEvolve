@@ -8,9 +8,13 @@ Full design: `systems_design.md` | Research spec: `experiment.md`
 
 ---
 
-## Current Status: Milestone 1 — Arm A Baseline
+## Current Status: Milestone 2 — Arm B (iterator agent). Milestone 1 ✅ COMPLETE.
 
-Build the harness, run the agent, get a baseline score. Nothing else. when reading the build sequence and starting a new task ensure that you look at /Users/mihirsawhney/Projects/TaskEvolve/systems_design.md and /Users/mihirsawhney/Projects/TaskEvolve/experiment.md to ensure that what you are building is compliant with these documents, use subagent driven development, after complete each sequence stop so I can review/give feedback for making edits
+**Standing workflow (applies to every milestone):** when starting a new task in a build sequence, read `/Users/mihirsawhney/Projects/TaskEvolve/systems_design.md` and `/Users/mihirsawhney/Projects/TaskEvolve/experiment.md` first to confirm what you build is compliant with those documents. Use subagent-driven development. After completing each sequence, stop so I can review / give feedback before the next.
+
+## Milestone 1 — Arm A Baseline ✅ COMPLETE
+
+Build the harness, run the agent, get a baseline score. Nothing else.
 
 ### Build Sequence
 
@@ -43,9 +47,15 @@ cd vendor/tau2-bench && uv sync --extra knowledge --extra gym --extra dev
 
 ---
 
-## Iterator Agent Edit Surface (Milestone 2+)
+## Milestone 2 — Arm B: Iterator-Optimized Harness
 
-The iterator can modify exactly these files — nothing else:
+Build the **iterator agent**: a separate process that reads proxy logs, proposes exactly **one** harness change per iteration, **double-runs proxy** (two logged seeds) to confirm the change beats the current-best distribution within guardrails, keeps or reverts, and repeats under a **fixed optimization budget**. The output is the Arm B optimized harness; validation runs **once, blind, post-hoc**. The iterator is the optimizer — it never performs the benchmark task itself.
+
+Spec: `experiment.md` §8.5 (iterator job), §19–20 (edit surface + change-acceptance rule), §21 (iteration loop), §22 (log fields), §23 (`iterator_agent/` layout); `systems_design.md` §3.5 (9-step architecture).
+
+> **Milestone-numbering note:** `experiment.md §14.2` labels "M2" as Arm C/D (open-weight models). We follow the `systems_design.md`/CLAUDE.md framing where **M2 = the iterator agent (Arm B)** — the natural next step after the Arm A baseline (`experiment.md §14.1`: "Arm B starts only after the Arm A baseline is reproducible and reviewed"). Open-weight arms (C/D) move to M3+.
+
+### Iterator Edit Surface — the iterator may modify exactly these files, nothing else
 
 | File | What it controls |
 |------|-----------------|
@@ -55,9 +65,54 @@ The iterator can modify exactly these files — nothing else:
 | `target_agent/harness.py` | History compression, tool filtering |
 | `target_agent/model_routing.py` | Model selection (gpt-4.1 vs gpt-4.1-mini) |
 
-### Deferred to M2 (iterator build)
+### Iterator Architecture — four roles, each a separate module
 
-- [ ] **Proper GENERATION traces + task/run grouping in Langfuse.** M1 uses LiteLLM's `langfuse_otel` callback (the only one compatible with Langfuse v4 — the native `"langfuse"` callback needs the removed v2 `langfuse.model`/`langfuse.client` APIs). OTEL spans get typed as `TOOL`/`SPAN` named `litellm_request`, so the dashboard's Generations view + per-model token/cost rollups look empty. The data is still captured (trace-level cost, token usage) and queryable via the REST API, and the headline `cost_per_successful_task` comes from TAU2's accounting in `results.csv`, not Langfuse — so M1 is unaffected. **Fix when building the iterator:** wrap the agent's LiteLLM call in a Langfuse v4 `start_as_current_generation()` (in `target_agent/`) and attach `task_id` + `run_id` metadata. This yields proper GENERATION observations *and* groups traces per task/run so the iterator can slice cost by task/model. (Do **not** downgrade to langfuse v2 to get the native callback.)
+A run starts when a **ticket** (the kickoff work-item: optimization objective + the fixed budget) is handed to the orchestrator. The orchestrator loads the **Arm A proxy distribution as the current-best baseline**, then drives the loop. **Only the editor calls an LLM** — the accept/reject decision is a deterministic rule, not an LLM judgment (so the loop is reproducible and auditable). Each LLM step gets its own Jinja prompt template under `iterator_agent/prompts/`; the deterministic steps are plain code.
+
+| Role | Module | LLM? | Responsibility |
+|------|--------|------|----------------|
+| **Orchestrator** | `iterator_agent/run_iteration.py` | no (control flow) | Receives the ticket, loads the current-best proxy baseline, drives one full propose→test→accept/revert cycle, repeats under the budget. |
+| **Editor** (diagnose → propose) | `iterator_agent/researcher.py` + `prompts/diagnose.j2`, `prompts/propose_edit.j2` | **yes** | Reads proxy failure feedback, proposes exactly **one** change to one allowed file with `change_summary` + `reason`. Two templates: one summarizes failures, one writes the concrete edit. |
+| **Eval-runner** | reuses `scripts/run_train_eval.run_repeats` / `benchmark/adapter.run_eval` | no | Runs the proxy split **twice** (two logged seeds) for the change under test; runs the blind validation event once at the end. Already built in M1 — wrap, don't rewrite. |
+| **Comparator / acceptance** | `iterator_agent/acceptance.py` + `baseline.py` | no (deterministic rule) | Accept iff **both** proxy runs beat the current-best proxy distribution within guardrails (`experiment.md §20`); else revert. |
+
+**Accept flow (per iteration):** ticket → load Arm A proxy as current-best → editor proposes one edit → `edit_guard` checks it touches only allowed files → apply → eval-runner runs **proxy ×2** → comparator applies the deterministic rule → **accept** (bump `config.HARNESS_VERSION`, commit, log to `accepted_changes.md`) or **revert** (log to `rejected_changes.md`). The full **validation suite is NOT run here** — it stays blind and runs once after the budget is exhausted (`Hard Constraints` #2/#4). "Improvement" per iteration = the proxy double-run, not validation.
+
+### Build Sequence
+
+**Foundations (observability + logging the iterator depends on):**
+
+- [ ] **Proper GENERATION traces + task/run grouping in Langfuse** (carried from M1's deferred list). M1 uses LiteLLM's `langfuse_otel` callback (the only one compatible with Langfuse v4 — the native `"langfuse"` callback needs the removed v2 `langfuse.model`/`langfuse.client` APIs), so OTEL spans get typed as `TOOL`/`SPAN` named `litellm_request` and the dashboard's Generations view + per-model token/cost rollups look empty. Data is still captured and REST-queryable, and the headline `cost_per_successful_task` comes from TAU2's accounting in `results.csv` — so M1 was unaffected. **Fix:** wrap the agent's LiteLLM call in a Langfuse v4 `start_as_current_generation()` (in `target_agent/`) and attach `task_id` + `run_id` metadata → proper GENERATION observations *and* per-task/run cost+token slicing the editor reads to localize expensive turns. (Do **not** downgrade to langfuse v2.)
+- [ ] `iterator_agent/iteration_log.py` — write one experiment-note entry per iteration with the `experiment.md §22` fields (`iteration_id`, `harness_version`, `changed_surface`/`changed_file`, `change_summary`, `reason_for_change`, proxy success before/after mean±std, guardrail metrics, `accepted_or_rejected`, `reason_accepted_or_rejected`). Append accepted vs rejected to `experiments/accepted_changes.md` / `experiments/rejected_changes.md`. This file (keyed by `iteration_id`) is the source for the per-iteration plots below; the per-run `results.csv` rows are reused unchanged — no schema break.
+
+**Edit guard + frozen config:**
+
+- [x] `iterator_agent/allowed_edits.yaml` — declares the allowed edit surface (the 5 files above), forbidden/frozen paths (`vendor/tau2-bench/`, `benchmark/splits/`, `benchmark/adapter.py`, `results/`, and the guard config itself), and the acceptance **guardrails** block (`task_success_floor_frac_of_best: 0.95` + cost/invalid-action ceilings declared as `null` until `acceptance.py` consumes them). Set before the run and **frozen for the run — the iterator may not edit this file** (`experiment.md §19.3`, §20).
+- [x] `iterator_agent/edit_guard.py` — validates a proposed change touches only allowed-surface files; rejects immediately on any frozen/forbidden path, absolute path, or `..` escape (the "Allowed Change Check" in the `experiment.md §12` data flow). API: `load_policy()` → `EditPolicy`, `evaluate(target, policy)` → `EditDecision`, `assert_allowed(target, policy)` (raises `ForbiddenEditError`). 10 unit tests in `tests/test_edit_guard.py`, all green; pinned `pyyaml` + added `iterator_agent` to the wheel packages.
+
+**Iterator core (the four roles):**
+
+- [ ] `iterator_agent/baseline.py` — **(comparator input)** load the current-best proxy distribution (mean ± std) from `experiments/results.csv`, seeded by the Arm A proxy rows, to score candidates against.
+- [ ] `iterator_agent/feedback.py` — **(editor input)** read **only** the most recent proxy run folder + proxy-linked Langfuse traces; summarize failures (per-task reward, termination reasons, cost/turns/tool-calls) into editor context. Proxy-only — never touches validation/test dirs (`Hard Constraints` #2).
+- [ ] `iterator_agent/researcher.py` + `iterator_agent/prompts/diagnose.j2`, `iterator_agent/prompts/propose_edit.j2` — **(editor — the only LLM role)** strong closed-weight model (e.g. Claude). `diagnose.j2` turns `feedback` into a failure analysis; `propose_edit.j2` turns that into exactly **one** concrete change to one allowed file with `change_summary` + `reason_for_change`. It is the optimizer, not a task-performer (`experiment.md §8.5`).
+- [ ] `iterator_agent/acceptance.py` — **(comparator — deterministic rule)** encode the change-acceptance + double-run rule (`experiment.md §20–21`): accept only if **both** proxy runs (seed A, seed B) improve vs current-best without crossing any guardrail; otherwise revert. No LLM.
+- [ ] `iterator_agent/run_iteration.py` — **(orchestrator)** one full iteration loop: accept the ticket → load best (`baseline`) → build `feedback` → editor proposes → `edit_guard` → apply → eval-runner proxy run (seed A) → if improved, proxy run (seed B) → `acceptance` rule → on accept **bump `config.HARNESS_VERSION`** (via env override the orchestrator sets, so each run's `results.csv` row attributes to its harness state) + commit + write note; on reject revert + log (`experiment.md §21` steps 1–14).
+
+**Driver + budget:**
+
+- [ ] `scripts/run_iterator.py` — run iterations under a **fixed, pre-declared optimization budget** (iteration count and/or cost cap, set before the run; `experiment.md §17.9`). Proxy split only.
+
+**Runs & verification:**
+
+- [ ] **Smoke the iterator loop (~$0)** — dry-run the full ticket→propose→guard→apply→proxy×2→accept/revert→note→commit chain on the mock/smoke split (or with a no-op proposed change) before spending proxy budget.
+- [ ] **Run Arm B optimization on proxy** under the fixed budget — accepted changes accumulate into the Arm B harness (`HARNESS_VERSION` bumped per accept). Iterator sees proxy only.
+- [ ] **Blind validation event — N=5, seeds `2001..2005`** — run the final Arm B harness once, post-hoc, against the 35-task validation split; compare to the Arm A validation distribution. If the proxy gain does not hold within guardrails, report Arm B as **proxy-overfit** (`experiment.md §20` tail).
+
+**Plots:**
+
+- [ ] **Per-iteration trajectory plot** (new mode in `scripts/plot_results.py`, reads `iteration_log`) — task success rate **and** cost per successful task vs iteration number (`experiment.md §25.1/§25.2`). This is what "cost + precision/recall over each iteration" maps to: per the confirmed metric choice, precision/recall = the two headline metrics (task success rate, cost per successful task). Accepted vs rejected iterations marked distinctly.
+- [ ] **Arm A vs Arm B frontier** — with ≥2 arms, the existing `plot_results.py` frontier mode auto-activates (cost-vs-success scatter, arm means as ◆ with std error bars) — the first real Pareto comparison.
+- [ ] _(milestone end, optional)_ **TAU2 official test split once** via `scripts/run_tau_test.py` — final Arm B reporting, run once, reported conservatively.
 
 ---
 
