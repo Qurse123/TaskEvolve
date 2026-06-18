@@ -824,7 +824,7 @@ After optimization ends, the final candidate is checked on the blind validation 
 Each iteration follows this loop:
 
 1. Run or load the current best proxy distribution.
-2. Iterator agent reads only proxy logs, proxy-linked Langfuse traces, and allowed source files.
+2. Iterator agent reads only proxy logs (verdicts + optional TAU2 transcripts) and allowed source files.
 3. Iterator agent proposes exactly one meaningful change.
 4. System checks whether the change touches only allowed files.
 5. If the change is invalid, reject immediately.
