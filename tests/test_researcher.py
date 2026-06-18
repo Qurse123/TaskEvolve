@@ -24,17 +24,22 @@ from iterator_agent.researcher import (
     run_editor,
 )
 
+_FAIL_7 = TaskRecord("retail_7", reward=0.0, passed=False, cost_usd=0.2, termination_reason="max_steps", seed=1, turn_count=30, tool_call_count=12)
+_FAIL_9 = TaskRecord("retail_9", reward=0.0, passed=False, cost_usd=0.3, termination_reason="max_steps", seed=1, turn_count=40, tool_call_count=15)
+_PASS_3 = TaskRecord("retail_3", reward=1.0, passed=True, cost_usd=0.05, termination_reason="user_stop", seed=1, turn_count=8, tool_call_count=3)
+
 FEEDBACK = FeedbackSummary(
     run_id="proxy_20260101_000000",
     split="proxy",
     num_tasks=3,
     num_passed=1,
     num_failed=2,
-    failed_tasks=(
-        TaskRecord("retail_7", reward=0.0, passed=False, cost_usd=0.2, termination_reason="max_steps", seed=1),
-        TaskRecord("retail_9", reward=0.0, passed=False, cost_usd=0.3, termination_reason="max_steps", seed=1),
-    ),
+    failed_tasks=(_FAIL_7, _FAIL_9),
     termination_reason_counts=(("max_steps", 2),),
+    tasks=(_PASS_3, _FAIL_7, _FAIL_9),
+    total_cost_usd=0.55,
+    cost_per_successful_task=0.55,
+    expensive_digests=(("retail_9", "assistant -> tool_call: get_order_details\ntool: not found"),),
 )
 
 _VALID_JSON = (
@@ -93,6 +98,17 @@ def test_render_diagnose_includes_run_and_failures():
     assert "proxy_20260101_000000" in text
     assert "retail_7" in text
     assert "max_steps" in text
+
+
+def test_render_diagnose_includes_cost_table_and_digest():
+    text = render_diagnose(FEEDBACK)
+
+    # Cost-centric framing + per-task cost levers across all tasks (incl. the pass).
+    assert "cost per successful task" in text
+    assert "retail_3" in text
+    assert "turns=30" in text
+    # The costliest task's transcript digest is shown to the editor.
+    assert "get_order_details" in text
 
 
 def test_render_propose_includes_diagnosis_and_allowed_file():

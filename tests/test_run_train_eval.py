@@ -22,7 +22,8 @@ def _ok_result(task_id: str = "t1") -> EvalResult:
     return EvalResult(
         task_id=task_id, domain="retail", split="validation", agent_model="gpt-4.1",
         reward=1.0, passed=True, agent_cost=0.05, termination_reason="done",
-        seed=2001, timestamp="2026-06-15T00:00:00+00:00",
+        seed=2001, turn_count=4, tool_call_count=2,
+        timestamp="2026-06-15T00:00:00+00:00",
     )
 
 
@@ -41,7 +42,7 @@ def test_is_transient_false_for_plain_error():
 def test_retries_transient_then_succeeds(monkeypatch):
     calls = {"n": 0}
 
-    def fake_run_eval(task_id, *, split, domain, seed):
+    def fake_run_eval(task_id, *, split, domain, seed, transcript_path=None):
         calls["n"] += 1
         if calls["n"] < 3:
             raise RateLimitError("429")
@@ -90,13 +91,18 @@ def test_failed_result_counts_as_failure():
     assert r.passed is False
     assert r.reward == 0.0
     assert r.agent_cost is None
+    assert r.turn_count == 0
+    assert r.tool_call_count == 0
     assert "RateLimitError" in r.termination_reason
 
 
 # --- _run_one_repeat ---------------------------------------------------------
 
-def test_run_one_repeat_records_failure_instead_of_aborting(monkeypatch):
-    def fake_run_eval(task_id, *, split, domain, seed):
+def test_run_one_repeat_records_failure_instead_of_aborting(monkeypatch, tmp_path):
+    seen_transcripts: list = []
+
+    def fake_run_eval(task_id, *, split, domain, seed, transcript_path=None):
+        seen_transcripts.append(transcript_path)
         if task_id == "bad":
             raise RateLimitError("429")
         return _ok_result(task_id)
@@ -104,7 +110,9 @@ def test_run_one_repeat_records_failure_instead_of_aborting(monkeypatch):
     logged: list = []
     monkeypatch.setattr(rte, "run_eval", fake_run_eval)
     monkeypatch.setattr(rte.time, "sleep", lambda _s: None)
-    monkeypatch.setattr(rte, "start_run", lambda split: SimpleNamespace(run_id="run_test"))
+    monkeypatch.setattr(
+        rte, "start_run", lambda split: SimpleNamespace(run_id="run_test", run_dir=tmp_path)
+    )
     monkeypatch.setattr(rte, "log_task", lambda run, result: logged.append(result))
     monkeypatch.setattr(rte, "finalize_run", lambda run, results: None)
 
@@ -112,3 +120,9 @@ def test_run_one_repeat_records_failure_instead_of_aborting(monkeypatch):
 
     assert len(logged) == 2  # both tasks logged; the run did not abort
     assert metrics.pass_rate == pytest.approx(0.5)  # one pass, one recorded failure
+    # Each task's transcript path is threaded through to run_eval, beside its verdict.
+    # ("bad" repeats because it is retried; assert the distinct set of paths.)
+    assert set(seen_transcripts) == {
+        tmp_path / "task_good_messages.json",
+        tmp_path / "task_bad_messages.json",
+    }
