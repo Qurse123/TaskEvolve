@@ -6,8 +6,7 @@ structured :class:`FeedbackSummary` the editor (``researcher.py``) reasons over.
 
 This module only ever reads the split it is asked for. The orchestrator always
 asks for ``"proxy"``, so the iterator never sees validation or test logs during
-optimization (CLAUDE.md "Hard Constraints" #2). Per-LLM-call telemetry lives in
-Langfuse and is correlated by ``task_id`` + ``run_id``, not duplicated here.
+optimization (CLAUDE.md "Hard Constraints" #2).
 """
 
 from __future__ import annotations

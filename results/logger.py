@@ -7,9 +7,8 @@ Writes one folder per eval run under ``experiments/logs/``:
     experiments/results.csv                           one row per run
 
 ``run_id`` is ``<split>_<YYYYMMDD>_<HHMMSS>``. Records are verdict-only (reward,
-pass/fail, cost, identity). Per-LLM-call telemetry — prompts, tokens, latency,
-tool steps — lives in Langfuse and is correlated by ``task_id`` + ``run_id``, not
-duplicated here (systems_design.md §3.4).
+pass/fail, cost, identity); richer per-turn detail is not duplicated here (it can
+be recovered from TAU2's SimulationRun transcript if persisted locally).
 
 The caller owns the task loop and the list of results; this module holds no
 mutable run state. Typical use:
