@@ -6,7 +6,6 @@ requires-python = ">=3.12"
 dependencies = [
     "tau2[knowledge,gym]",
     "jinja2>=3.1",
-    "langfuse>=2.0",
     "litellm>=1.40",
     "pydantic>=2.0",
     "python-dotenv>=1.0",
