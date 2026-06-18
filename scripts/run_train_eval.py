@@ -24,11 +24,12 @@ import statistics
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import List, Optional, Sequence
 
 from benchmark.adapter import EvalResult, run_eval
 from benchmark.splits import load_split
-from results.logger import finalize_run, log_task, start_run
+from results.logger import finalize_run, log_task, start_run, transcript_path
 from settings import config
 
 logger = logging.getLogger(__name__)
@@ -90,7 +91,8 @@ def _is_transient(exc: BaseException) -> bool:
 
 
 def _run_task_with_retries(
-    task_id: str, *, split: str, domain: str, seed: int
+    task_id: str, *, split: str, domain: str, seed: int,
+    transcript_path: Optional[Path] = None,
 ) -> EvalResult:
     """Run one task, retrying transient errors with exponential backoff.
 
@@ -99,7 +101,10 @@ def _run_task_with_retries(
     attempt = 0
     while True:
         try:
-            return run_eval(task_id, split=split, domain=domain, seed=seed)
+            return run_eval(
+                task_id, split=split, domain=domain, seed=seed,
+                transcript_path=transcript_path,
+            )
         except Exception as exc:  # noqa: BLE001 - classify, then retry or re-raise
             if not _is_transient(exc) or attempt >= MAX_TASK_RETRIES:
                 raise
@@ -126,6 +131,8 @@ def _failed_result(
         agent_cost=None,
         termination_reason=f"harness_error: {type(error).__name__}: {error}",
         seed=seed,
+        turn_count=0,
+        tool_call_count=0,
         timestamp=datetime.now(timezone.utc).isoformat(),
     )
 
@@ -144,7 +151,10 @@ def _run_one_repeat(
     results: List[EvalResult] = []
     for task_id in task_ids:
         try:
-            result = _run_task_with_retries(task_id, split=split, domain=domain, seed=seed)
+            result = _run_task_with_retries(
+                task_id, split=split, domain=domain, seed=seed,
+                transcript_path=transcript_path(run, task_id),
+            )
         except Exception as exc:  # noqa: BLE001 - keep the batch alive; record as failure
             logger.exception(
                 "  task %s (seed=%d) failed permanently; recording as failure: %s",
