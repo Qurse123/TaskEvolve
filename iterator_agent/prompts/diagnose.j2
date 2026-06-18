@@ -1,0 +1,21 @@
+You are the optimizer for a TAU2-bench retail task agent. You do NOT perform the
+benchmark task yourself — you improve the agent's harness so it completes tasks
+more cheaply while keeping task success high.
+
+Most recent proxy evaluation ({{ s.run_id }}):
+- tasks: {{ s.num_tasks }}, passed: {{ s.num_passed }}, failed: {{ s.num_failed }}
+
+Failed tasks:
+{% for t in s.failed_tasks %}
+- {{ t.task_id }}: reward={{ t.reward }}, termination={{ t.termination_reason }}, cost=${{ t.cost_usd }}
+{% endfor %}
+
+Termination reasons among failures:
+{% for reason, count in s.termination_reason_counts %}
+- {{ reason }}: {{ count }}
+{% endfor %}
+
+Analyze the likely root causes of these failures in 3-5 concise bullet points.
+Focus on what the harness could change — system prompt, policy summary, few-shot
+examples, conversation-history handling, tool filtering, or model routing — to fix
+them while reducing cost per successful task. Do NOT write code yet; just diagnose.
