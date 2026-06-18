@@ -724,13 +724,17 @@ The claim should be:
 
 ### 19.1 Allowed Harness Editable Files
 
-The iterator agent may edit:
+The iterator agent may edit. The list below is the broad conceptual design space
+across arms; for **Milestone 2 (Arm B)** the enforced, frozen editable surface is
+the narrower set declared in `iterator_agent/allowed_edits.yaml` — exactly five
+files: `prompts/system_prompt.j2`, `prompts/policy_summary.j2`,
+`prompts/few_shot_examples.j2`, `harness.py`, `model_routing.py`. Prompts are
+Jinja2 templates (`.j2`), not Markdown.
 
 ```text
-target_agent/prompts/system_prompt.md
-target_agent/prompts/task_prompt.md
-target_agent/prompts/policy_summary.md
-target_agent/prompts/few_shot_examples.md
+target_agent/prompts/system_prompt.j2
+target_agent/prompts/policy_summary.j2
+target_agent/prompts/few_shot_examples.j2
 target_agent/harness.py
 target_agent/tool_selection.py
 target_agent/context_compression.py
@@ -824,7 +828,7 @@ After optimization ends, the final candidate is checked on the blind validation 
 Each iteration follows this loop:
 
 1. Run or load the current best proxy distribution.
-2. Iterator agent reads only proxy logs (verdicts + optional TAU2 transcripts) and allowed source files.
+2. Iterator agent reads only proxy logs (per-task verdicts plus the TAU2 `SimulationRun` transcript persisted for every task) and allowed source files. The transcripts are the primary cost evidence: the editor sees a per-task cost table (cost, turns, tool calls across all tasks) and turn-by-turn digests of the costliest tasks, to cut cost while holding success.
 3. Iterator agent proposes exactly one meaningful change.
 4. System checks whether the change touches only allowed files.
 5. If the change is invalid, reject immediately.
@@ -913,10 +917,9 @@ cost-aware-agent-cooptimization/
     agent.py
     harness.py
     prompts/
-      system_prompt.md
-      task_prompt.md
-      policy_summary.md
-      few_shot_examples.md
+      system_prompt.j2
+      policy_summary.j2
+      few_shot_examples.j2
     policies/
       tool_selection.py
       memory_policy.py
@@ -943,21 +946,27 @@ cost-aware-agent-cooptimization/
     model_registry.yaml
 
   iterator_agent/
-    researcher.py
-    experiment_policy.md
-    allowed_edits.yaml
-    run_iteration.py
+    allowed_edits.yaml      # frozen edit surface + guardrails + double-run protocol
+    edit_guard.py           # allowed-change check
+    baseline.py             # current-best proxy distribution (comparator input)
+    feedback.py             # cost-centric summary + transcript digests (editor input)
+    researcher.py           # the editor (only LLM role) + prompts/diagnose.j2, propose_edit.j2
+    acceptance.py           # deterministic accept/revert rule
+    iteration_log.py        # per-iteration §22 record + accepted/rejected changelogs
+    run_iteration.py        # orchestrator: one propose->test->keep/revert cycle
 
   experiments/
-    logs/
+    logs/                   # per-run folders: task_<id>.json + task_<id>_messages.json
+    iterations/             # per-iteration records (iteration.json + debug artifacts)
     accepted_changes.md
     rejected_changes.md
     results.csv
-    graphs/
+    plots/
 
   scripts/
     run_smoke.py
     run_train_eval.py
+    run_iterator.py         # Arm B optimization driver (fixed budget; proxy only)
     run_tau_test.py
     run_transfer.py
     plot_results.py
