@@ -3,11 +3,11 @@
 This is the zero-cost gate before spending real money on the retail splits. It
 exercises the full pipeline exactly as the real runners will:
 
-    init_tracing -> start_run -> run_eval (per task) -> log_task -> finalize_run -> flush_tracing
+    start_run -> run_eval (per task) -> log_task -> finalize_run
 
 The smoke split uses TAU2's trivial mock domain, so LLM cost is negligible. A
-green run proves the agent injection, orchestrator loop, evaluator, results
-logger, and Langfuse callback are all correctly wired before we touch retail.
+green run proves the agent injection, orchestrator loop, evaluator, and results
+logger are all correctly wired before we touch retail.
 
 Run from the repo root:
     python -m scripts.run_smoke
@@ -21,7 +21,6 @@ from typing import List
 from benchmark.adapter import EvalResult, run_eval
 from benchmark.splits import load_split
 from results.logger import finalize_run, log_task, start_run
-from target_agent.traces.langfuse_setup import flush_tracing, init_tracing
 
 logger = logging.getLogger(__name__)
 
@@ -34,25 +33,20 @@ def run_smoke() -> int:
     task_ids = load_split(SMOKE_SPLIT)
     logger.info("Smoke split: %d mock task(s) -> %s", len(task_ids), task_ids)
 
-    init_tracing()
     run = start_run(SMOKE_SPLIT)
     results: List[EvalResult] = []
-    try:
-        for task_id in task_ids:
-            result = run_eval(task_id, split=SMOKE_SPLIT, domain=SMOKE_DOMAIN)
-            log_task(run, result)
-            results.append(result)
-            logger.info(
-                "  %s: reward=%.2f passed=%s cost=%s",
-                result.task_id,
-                result.reward,
-                result.passed,
-                result.agent_cost,
-            )
-        summary_path = finalize_run(run, results)
-    finally:
-        # Always flush traces, even if a task raised mid-run.
-        flush_tracing()
+    for task_id in task_ids:
+        result = run_eval(task_id, split=SMOKE_SPLIT, domain=SMOKE_DOMAIN)
+        log_task(run, result)
+        results.append(result)
+        logger.info(
+            "  %s: reward=%.2f passed=%s cost=%s",
+            result.task_id,
+            result.reward,
+            result.passed,
+            result.agent_cost,
+        )
+    summary_path = finalize_run(run, results)
 
     num_passed = sum(1 for r in results if r.passed)
     logger.info("Smoke complete: %d/%d passed", num_passed, len(results))

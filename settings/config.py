@@ -37,16 +37,6 @@ ITERATOR_MODEL = os.environ.get("ITERATOR_MODEL")
 # Reward at or above which a task counts as a pass (design §3.3).
 PASS_THRESHOLD = 0.5
 
-# --- Observability ---
-# Whether to emit Langfuse traces. TaskEvolve reads this flag and wires the
-# LiteLLM -> Langfuse callback in target_agent/traces/langfuse_setup.py.
-USE_LANGFUSE = os.environ.get("USE_LANGFUSE", "false").strip().lower() in {
-    "1",
-    "true",
-    "yes",
-    "on",
-}
-
 # --- Harness ---
 # Version label for the editable harness surface (prompts, harness.py,
 # model_routing.py). Recorded in each task log so results trace to a harness
