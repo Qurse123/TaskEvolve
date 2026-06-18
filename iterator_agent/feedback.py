@@ -17,7 +17,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
 
-from results.logger import DEFAULT_LOGS_ROOT
+from results.logger import DEFAULT_LOGS_ROOT, _safe
+
+# How many of the costliest tasks get a transcript digest in the feedback, and how
+# far each message is truncated — both bound the editor's (iterator search) cost.
+NUM_EXPENSIVE_DIGESTS = 2
+DIGEST_MAX_CHARS = 200
 
 
 @dataclass(frozen=True)
@@ -30,6 +35,9 @@ class TaskRecord:
     cost_usd: Optional[float]
     termination_reason: str
     seed: Optional[int]
+    # Per-task cost levers (experiment.md §22); default 0 for older logs / harness errors.
+    turn_count: int = 0
+    tool_call_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -43,6 +51,12 @@ class FeedbackSummary:
     num_failed: int
     failed_tasks: Tuple[TaskRecord, ...]
     termination_reason_counts: Tuple[Tuple[str, int], ...]
+    # Cost-centric evidence; default-empty so call sites that only set the failure
+    # fields still construct cleanly (summarize_run always populates these).
+    tasks: Tuple[TaskRecord, ...] = ()
+    total_cost_usd: Optional[float] = None
+    cost_per_successful_task: Optional[float] = None
+    expensive_digests: Tuple[Tuple[str, str], ...] = ()
 
 
 def find_latest_run_dir(
@@ -76,34 +90,103 @@ def _load_task(path: Path) -> TaskRecord:
         reward=float(record.get("reward", 0.0)),
         passed=bool(record.get("passed", False)),
         cost_usd=record.get("cost_usd"),
+        turn_count=int(record.get("turn_count", 0) or 0),
+        tool_call_count=int(record.get("tool_call_count", 0) or 0),
         termination_reason=str(record.get("termination_reason", "")),
         seed=record.get("seed"),
     )
 
 
 def load_run_tasks(run_dir: Union[str, Path]) -> List[TaskRecord]:
-    """Parse every ``task_*.json`` in ``run_dir`` (ignores ``run_summary.json``)."""
+    """Parse every verdict ``task_*.json`` in ``run_dir``.
+
+    Skips the paired ``task_*_messages.json`` transcripts (raw evidence, not a
+    verdict) and ``run_summary.json``.
+    """
     run_dir = Path(run_dir)
-    return [_load_task(p) for p in sorted(run_dir.glob("task_*.json"))]
+    return [
+        _load_task(p)
+        for p in sorted(run_dir.glob("task_*.json"))
+        if not p.name.endswith("_messages.json")
+    ]
+
+
+def _render_message(message: dict) -> str:
+    """One compact transcript line: role + tool name(s) or truncated content."""
+    role = message.get("role", "?")
+    tool_calls = message.get("tool_calls") or []
+    if tool_calls:
+        names = ", ".join(str(tc.get("name", "?")) for tc in tool_calls)
+        return f"{role} -> tool_call: {names}"
+    content = (message.get("content") or "").strip().replace("\n", " ")
+    if len(content) > DIGEST_MAX_CHARS:
+        content = content[:DIGEST_MAX_CHARS] + "…"
+    return f"{role}: {content}"
+
+
+def _load_transcript_digest(run_dir: Path, task_id: str) -> Optional[str]:
+    """Render a compact turn-by-turn digest of a task's transcript, if persisted."""
+    path = run_dir / f"task_{_safe(task_id)}_messages.json"
+    if not path.exists():
+        return None
+    messages = json.loads(path.read_text(encoding="utf-8")).get("messages") or []
+    return "\n".join(_render_message(m) for m in messages)
+
+
+def _expensive_digests(
+    run_dir: Path, tasks: List[TaskRecord]
+) -> Tuple[Tuple[str, str], ...]:
+    """Digests for the ``NUM_EXPENSIVE_DIGESTS`` costliest tasks (concrete waste evidence)."""
+    with_cost = sorted(
+        (t for t in tasks if t.cost_usd is not None),
+        key=lambda t: t.cost_usd or 0.0,
+        reverse=True,
+    )
+    digests: List[Tuple[str, str]] = []
+    for task in with_cost[:NUM_EXPENSIVE_DIGESTS]:
+        digest = _load_transcript_digest(run_dir, task.task_id)
+        if digest:
+            digests.append((task.task_id, digest))
+    return tuple(digests)
 
 
 def summarize_run(run_dir: Union[str, Path]) -> FeedbackSummary:
-    """Aggregate a run folder's task verdicts into a :class:`FeedbackSummary`."""
+    """Aggregate a run folder into a cost-centric :class:`FeedbackSummary`.
+
+    Covers all tasks (passing tasks waste cost too), reports total cost and
+    cost-per-successful-task (the objective), and attaches transcript digests for
+    the costliest tasks so the editor can target concrete waste.
+    """
     run_dir = Path(run_dir)
     tasks = load_run_tasks(run_dir)
     failed = tuple(t for t in tasks if not t.passed)
+    num_passed = len(tasks) - len(failed)
+
     reason_counts = Counter(t.termination_reason for t in failed)
     # Most common first; ties broken by reason for a stable, testable order.
     ordered = tuple(sorted(reason_counts.items(), key=lambda kv: (-kv[1], kv[0])))
+
+    costs = [t.cost_usd for t in tasks if t.cost_usd is not None]
+    total_cost = sum(costs) if costs else None
+    cost_per_success = (
+        total_cost / num_passed if (total_cost is not None and num_passed) else None
+    )
+
     split = run_dir.name.split("_", 1)[0]
     return FeedbackSummary(
         run_id=run_dir.name,
         split=split,
         num_tasks=len(tasks),
-        num_passed=len(tasks) - len(failed),
+        num_passed=num_passed,
         num_failed=len(failed),
+        tasks=tuple(tasks),
         failed_tasks=failed,
         termination_reason_counts=ordered,
+        total_cost_usd=round(total_cost, 6) if total_cost is not None else None,
+        cost_per_successful_task=(
+            round(cost_per_success, 6) if cost_per_success is not None else None
+        ),
+        expensive_digests=_expensive_digests(run_dir, tasks),
     )
 
 
