@@ -35,8 +35,8 @@ This document describes the architecture for **Milestone 1**: the baseline evalu
                       ▼
 ┌─────────────────────────────────────────────────────────────┐
 │             OBSERVABILITY LAYER  (ours)                     │
-│  Langfuse: per-LLM-call traces (cost, tokens, latency)     │
-│  Structured JSON logs: per-task outcome + tool call trace  │
+│  Local files only (no Langfuse — removed in M2):           │
+│  results.csv + per-task verdict JSON (reward/cost/etc.)    │
 └─────────────────────┬───────────────────────────────────────┘
                       │ (Milestone 2+)
                       ▼
@@ -202,11 +202,9 @@ Proxy and validation task IDs are generated once by `benchmark/splits.py` with a
 
 Two complementary layers serve different audiences.
 
-**Langfuse — for human debugging:**
+**Per-turn debugging — local files (Langfuse removed in M2):**
 
-The agent's model calls run through LiteLLM (`litellm.completion`). TAU2-bench *would* wire Langfuse, but `vendor/tau2-bench` hardcodes `USE_LANGFUSE = False` as a literal (it never reads the env var) and is frozen — so the `.env` flag alone does nothing. Instead, `target_agent/traces/langfuse_setup.py` reads our own `USE_LANGFUSE` (in `settings/config.py`) and enables LiteLLM's `langfuse_otel` callback, the integration compatible with the installed Langfuse v3+ SDK. Once enabled, every `generate()` call emits a trace to the Langfuse dashboard showing the full prompt, model response, token counts, dollar cost, and latency — the right tool for answering "why did the agent call the wrong tool on turn 6?"
-
-Call `init_tracing()` at run start and `flush_tracing()` before the script exits, or background traces are lost. See Section 7.1 (Known Tradeoffs) for why we do not stand up a separate OpenTelemetry collector.
+The project originally wired Langfuse (LiteLLM `langfuse_otel` callback) for per-call traces. It was **removed in Milestone 2**: nothing in the metric pipeline depended on it (the headline `cost_per_successful_task` comes from TAU2's accounting in `results.csv`), it added an external service + API keys, and for debugging the iterator, local files are simpler, greppable, in-git, and deterministic. When per-turn detail is needed ("why did the agent call the wrong tool on turn 6?"), persist TAU2's `SimulationRun` transcript into the run folder; the iterator itself is debugged from its per-iteration log folders, not a hosted UI.
 
 **Structured JSON task log — for the iterator agent:**
 
@@ -248,9 +246,9 @@ Each task JSON:
 }
 ```
 
-The per-task JSON is **verdict-only** — reward, pass/fail, cost, and identity. Per-LLM-call telemetry (prompts, responses, token counts, latency, tool/retrieval steps) is **not** duplicated here; it lives in Langfuse and is correlated by `task_id` + `run_id`. This keeps our logs minimal and avoids re-deriving data the tracer already owns.
+The per-task JSON is **verdict-only** — reward, pass/fail, cost, and identity. Per-turn detail (prompts, responses, tool steps) is **not** duplicated here; when needed it can be recovered from TAU2's `SimulationRun` transcript (persisted locally). This keeps our logs minimal.
 
-`run_summary.json` contains aggregate metrics for the run. `results.csv` appends one summary row per run. The iterator reads the most recent run folder for a given split (plus Langfuse for call-level detail) to generate its feedback.
+`run_summary.json` contains aggregate metrics for the run. `results.csv` appends one summary row per run. The iterator reads the most recent run folder for a given split to generate its feedback.
 
 ### 3.5 Iterator Agent (Milestone 2 Preview)
 
@@ -284,7 +282,6 @@ TaskEvolveAgent.generate_next_message(message, state)
   ├── harness.py: optionally filter or rewrite tool descriptions
   └── generate(model="gpt-4.1", tools=tools, messages=messages)
         [LiteLLM -> OpenAI API]
-        [Langfuse trace emitted automatically]
             |
             v AssistantMessage
        tool_call? ──yes──> return to TAU2 Orchestrator
@@ -324,8 +321,6 @@ TaskEvolve/
 │   ├── agent.py               # TaskEvolveAgent(HalfDuplexAgent)
 │   ├── harness.py             # context compression, tool filtering helpers
 │   ├── model_routing.py       # model selection logic (stubbed in M1)
-│   ├── traces/                # Langfuse tracing setup (observability — NOT iterator-editable)
-│   │   └── langfuse_setup.py  # enables LiteLLM langfuse_otel callback; init_tracing/flush_tracing
 │   └── prompts/
 │       ├── system_prompt.j2   # Jinja2 template — agent persona and instructions
 │       ├── policy_summary.j2  # Jinja2 template — compressed domain policy
@@ -369,11 +364,11 @@ TaskEvolve/
 4. `target_agent/agent.py` — minimal `TaskEvolveAgent` using TAU2's `generate()` utility
 5. `target_agent/prompts/system_prompt.j2` — initial agent system prompt (Jinja2)
 6. `benchmark/adapter.py` — `run_eval()` injects `TaskEvolveAgent` into TAU2's `Orchestrator`, runs `run_simulation()` (frozen evaluator), returns a verdict-only `EvalResult`
-7. `target_agent/traces/langfuse_setup.py` — wire Langfuse (LiteLLM `langfuse_otel` callback) before first run
+7. ~~`target_agent/traces/langfuse_setup.py`~~ — Langfuse wiring (built in M1, **removed in M2**; observability is local files only)
 8. `results/logger.py` — per-run folder JSON task log writer
 9. Generate `benchmark/splits/*.json` once and freeze the task IDs before any paid benchmark run
 10. `scripts/run_smoke.py` — 3 mock tasks, end-to-end wiring check
-11. **Run smoke test** — confirm logs and Langfuse traces appear before spending real budget
+11. **Run smoke test** — confirm logs appear before spending real budget
 12. `scripts/run_train_eval.py` — proxy and validation runner with `--repeats N --seed-start S`
 13. **Run proxy baseline ×5** (~$15 total, 12 tasks × 5 seeds `1001..1005`) — first real Arm A proxy distribution
 14. **Run validation baseline ×5 once, post-hoc** (~$50 total, 35 tasks × 5 seeds `2001..2005`) — official Arm A validation distribution
@@ -395,11 +390,11 @@ cd vendor/tau2-bench && uv sync --extra knowledge --extra gym --extra dev
 
 OpenTelemetry is a distributed tracing standard for microservices. It requires a collector process, an OTLP exporter, and span context propagation across service boundaries.
 
-Our system is a single Python process. The iterator agent's feedback loop needs two things at different grains: the per-task **verdict** (reward, pass/fail, cost) and per-call **telemetry** (which tool was called, which turn failed, the prompt/response). We split these by owner: the verdict goes to a flat per-task JSON file we write; the per-call telemetry is owned by Langfuse, which our `target_agent/traces/` module populates by enabling LiteLLM's `langfuse_otel` callback. We do not copy Langfuse-owned data into our JSON.
+Our system is a single Python process. The iterator agent's feedback loop needs the per-task **verdict** (reward, pass/fail, cost), which we write to a flat per-task JSON file. Richer per-turn detail (which tool was called, which turn failed, the prompt/response), when needed, is recovered from TAU2's `SimulationRun` transcript persisted to the same run folder — no separate tracing service.
 
-For LLM-call-level visibility (prompts, tokens, cost), **Langfuse** is purpose-built for this. The `langfuse_otel` callback exports straight to Langfuse's ingestion endpoint — no separate collector or sink — so it needs no infrastructure beyond `pip install langfuse` and a Langfuse API key. (TAU2 ships its own Langfuse hook but hardcodes it off in a frozen file; we enable our own instead — see §3.4.)
+For occasional LLM-call-level inspection (prompts, tokens, cost), the local transcript plus LiteLLM's per-call `response_cost` are sufficient and stay in-repo. We deliberately avoid a hosted tracing service — **Langfuse was removed in M2** — to keep the stack local, deterministic, greppable, and free of external keys.
 
-OpenTelemetry would add operational complexity — a collector, an exporter sink, cardinality config — for no signal the iterator or a human debugger cannot get from Langfuse + JSON task logs. We revisit OTel if we later build an HTTP API service wrapping the agent.
+OpenTelemetry would add operational complexity — a collector, an exporter sink, cardinality config — for no signal the iterator or a human debugger cannot get from local JSON logs + TAU2 transcripts. We revisit OTel if we later build an HTTP API service wrapping the agent.
 
 ### 7.2 Why Not Run Full Benchmark Per Iteration
 

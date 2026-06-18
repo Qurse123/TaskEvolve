@@ -4,7 +4,7 @@ Flow: build TAU2 environment and user -> inject TaskEvolveAgent into the
 Orchestrator -> run the simulation -> return a normalized EvalResult.
 
 This adapter does not write logs or CSV files; results/logger.py owns
-run-level persistence, while Langfuse captures per-LLM-call telemetry.
+run-level persistence.
 """
 
 from __future__ import annotations
@@ -39,10 +39,9 @@ USER_SIMULATOR = "user_simulator"
 class EvalResult:
     """The benchmark verdict for a single task simulation.
 
-    Deliberately minimal: only what Langfuse does NOT capture — the evaluator's
-    reward, pass/fail, and cost-per-success inputs. Per-call telemetry (tokens,
-    latency, tool steps, prompt/response) lives in Langfuse and is correlated by
-    ``task_id`` and run id, not duplicated here.
+    Deliberately minimal: the evaluator's reward, pass/fail, and cost-per-success
+    inputs. Richer per-turn detail (prompts, tool steps) is not captured here; it
+    can be recovered from TAU2's SimulationRun transcript if persisted locally.
     """
 
     task_id: str
