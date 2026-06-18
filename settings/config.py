@@ -28,6 +28,10 @@ load_dotenv()
 AGENT_MODEL = os.environ.get("AGENT_MODEL")
 # TAU2 user-simulator model. Optional — None uses TAU2's default.
 USER_MODEL = os.environ.get("USER_MODEL")
+# Model the iterator's editor (the optimizer, e.g. Claude) uses to propose
+# harness edits. Separate from AGENT_MODEL — the iterator runs a strong
+# closed-weight model. Required only when running the iterator (Milestone 2).
+ITERATOR_MODEL = os.environ.get("ITERATOR_MODEL")
 
 # --- Evaluation ---
 # Reward at or above which a task counts as a pass (design §3.3).
