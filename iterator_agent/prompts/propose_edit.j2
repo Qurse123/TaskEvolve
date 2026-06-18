@@ -1,0 +1,21 @@
+{{ diagnosis }}
+
+You may edit EXACTLY ONE of the following files, replacing its entire contents.
+These are the only files you are allowed to change.
+
+{% for path, content in allowed_files %}
+===== {{ path }} =====
+{{ content }}
+
+{% endfor %}
+Propose exactly ONE change to ONE file that should reduce cost per successful task
+without lowering task success. Keep the change focused enough to attribute its
+effect.
+
+Respond with ONLY a JSON object (no prose, no markdown fences) of the form:
+{
+  "target_file": "<one of the allowed paths above, verbatim>",
+  "new_content": "<the complete new contents of that file>",
+  "change_summary": "<one line describing the change>",
+  "reason_for_change": "<why this should help, tied to the observed failures>"
+}
