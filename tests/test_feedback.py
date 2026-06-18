@@ -7,6 +7,7 @@ Run from the repo root:
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -22,7 +23,8 @@ from iterator_agent.feedback import (
 from results.logger import finalize_run, log_task, start_run
 
 
-def _result(task_id, *, passed, reward, cost, term="user_stop", seed=1, split="proxy"):
+def _result(task_id, *, passed, reward, cost, term="user_stop", seed=1, split="proxy",
+            turns=5, tool_calls=2):
     return EvalResult(
         task_id=task_id,
         domain="retail",
@@ -33,6 +35,8 @@ def _result(task_id, *, passed, reward, cost, term="user_stop", seed=1, split="p
         agent_cost=cost,
         termination_reason=term,
         seed=seed,
+        turn_count=turns,
+        tool_call_count=tool_calls,
         timestamp="2026-01-01T00:00:00+00:00",
     )
 
@@ -113,4 +117,76 @@ def test_summary_ignores_run_summary_json(tmp_path):
 
     # run_summary.json exists in the folder but must not be parsed as a task.
     assert (run_dir / "run_summary.json").exists()
+    assert summary.num_tasks == 1
+
+
+def test_summary_is_cost_centric_across_all_tasks(tmp_path):
+    run_id = _make_run(
+        tmp_path,
+        "proxy",
+        _at(1),
+        [
+            _result("pass_1", passed=True, reward=1.0, cost=0.10, turns=4, tool_calls=1),
+            _result("pass_2", passed=True, reward=1.0, cost=0.12, turns=6, tool_calls=3),
+            _result("fail_1", passed=False, reward=0.0, cost=0.20, term="max_steps"),
+        ],
+    )
+    summary = summarize_run(tmp_path / run_id)
+
+    # The cost table covers ALL tasks (not just failures), with per-task cost levers.
+    assert {t.task_id for t in summary.tasks} == {"pass_1", "pass_2", "fail_1"}
+    pass_1 = next(t for t in summary.tasks if t.task_id == "pass_1")
+    assert (pass_1.turn_count, pass_1.tool_call_count) == (4, 1)
+    # Objective signal: total cost and cost-per-successful-task.
+    assert summary.total_cost_usd == pytest.approx(0.42)
+    assert summary.cost_per_successful_task == pytest.approx(0.21)  # 0.42 / 2 passed
+
+
+def test_expensive_digests_render_costliest_transcripts(tmp_path):
+    run_id = _make_run(
+        tmp_path,
+        "proxy",
+        _at(1),
+        [
+            _result("cheap", passed=True, reward=1.0, cost=0.05),
+            _result("pricey", passed=True, reward=1.0, cost=0.50),
+        ],
+    )
+    run_dir = tmp_path / run_id
+    # Persist a transcript for the costliest task (as run_eval would).
+    (run_dir / "task_pricey_messages.json").write_text(
+        json.dumps(
+            {
+                "messages": [
+                    {"role": "assistant", "content": None,
+                     "tool_calls": [{"name": "get_order_details"}]},
+                    {"role": "tool", "content": "order #123 found"},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    summary = summarize_run(run_dir)
+
+    assert len(summary.expensive_digests) == 1
+    task_id, digest = summary.expensive_digests[0]
+    assert task_id == "pricey"  # the costliest task is digested first
+    assert "get_order_details" in digest
+    assert "order #123 found" in digest
+
+
+def test_load_run_tasks_ignores_messages_files(tmp_path):
+    run_id = _make_run(
+        tmp_path, "proxy", _at(1),
+        [_result("t1", passed=True, reward=1.0, cost=0.1)],
+    )
+    run_dir = tmp_path / run_id
+    # A transcript file sits beside the verdict; it must NOT be parsed as a task.
+    (run_dir / "task_t1_messages.json").write_text(
+        json.dumps({"messages": []}), encoding="utf-8"
+    )
+
+    summary = summarize_run(run_dir)
+
     assert summary.num_tasks == 1
