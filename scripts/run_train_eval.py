@@ -30,7 +30,6 @@ from benchmark.adapter import EvalResult, run_eval
 from benchmark.splits import load_split
 from results.logger import finalize_run, log_task, start_run
 from settings import config
-from target_agent.traces.langfuse_setup import flush_tracing, init_tracing
 
 logger = logging.getLogger(__name__)
 
@@ -62,14 +61,10 @@ def run_repeats(
         split, len(task_ids), repeats, seed_start, seed_start + repeats - 1, domain,
     )
 
-    init_tracing()
     metrics: List[RepeatMetrics] = []
-    try:
-        for offset in range(repeats):
-            seed = seed_start + offset
-            metrics.append(_run_one_repeat(split, task_ids, domain=domain, seed=seed))
-    finally:
-        flush_tracing()
+    for offset in range(repeats):
+        seed = seed_start + offset
+        metrics.append(_run_one_repeat(split, task_ids, domain=domain, seed=seed))
 
     _log_distribution(split, metrics)
     return metrics
