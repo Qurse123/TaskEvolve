@@ -101,7 +101,7 @@ A run starts when a **ticket** (the kickoff work-item: optimization objective + 
 
 **Driver + budget:**
 
-- [ ] `scripts/run_iterator.py` — run iterations under a **fixed, pre-declared optimization budget** (iteration count and/or cost cap, set before the run; `experiment.md §17.9`). Proxy split only.
+- [x] `scripts/run_iterator.py` — runs iterations under a **fixed, pre-declared optimization budget** (`--max-iterations` always, optional `--max-search-cost-usd`; `experiment.md §17.9`). Proxy split only. Loads the Arm A proxy distribution as the initial current-best, loops `run_iteration` (seeds `seed_start+2i, +1` per iteration), and after each **accept** promotes the candidate's proxy double-run to the new current-best (greedy hill-climb; `_distribution_from_result` reuses `Distribution` from the iteration record — no CSV re-read, no new dataclass); a reject leaves the baseline untouched. Sums per-iteration `search_cost_usd` and stops once the cap is crossed (may overshoot by one iteration's cost — can't know it before running). API: `run_iterator(*, max_iterations, seed_start, split="proxy", max_search_cost_usd=None, initial_best/initial_version/complete/eval_seed/commit/... injectable)` → `List[IterationResult]`; `main(argv)`. 5 unit tests in `tests/test_run_iterator.py` (stops at max-iterations + seed-B short-circuit, accept advances best, reject keeps best, search-cost cap stops early, CLI rejects `--max-iterations 0`), all green.
 
 **Runs & verification:**
 
