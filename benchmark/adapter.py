@@ -3,15 +3,18 @@
 Flow: build TAU2 environment and user -> inject TaskEvolveAgent into the
 Orchestrator -> run the simulation -> return a normalized EvalResult.
 
-This adapter does not write logs or CSV files; results/logger.py owns
-run-level persistence.
+This adapter does not write the run logs or CSV (results/logger.py owns
+run-level persistence). The one file it writes is the per-task SimulationRun
+transcript, and only when run_eval is handed a transcript_path (the location is
+still chosen by results.logger.transcript_path).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Optional
+from pathlib import Path
+from typing import Optional, Tuple
 
 from tau2.config import (
     DEFAULT_LLM_ARGS_AGENT,
@@ -39,9 +42,11 @@ USER_SIMULATOR = "user_simulator"
 class EvalResult:
     """The benchmark verdict for a single task simulation.
 
-    Deliberately minimal: the evaluator's reward, pass/fail, and cost-per-success
-    inputs. Richer per-turn detail (prompts, tool steps) is not captured here; it
-    can be recovered from TAU2's SimulationRun transcript if persisted locally.
+    The evaluator's reward, pass/fail, and cost-per-success inputs, plus the two
+    per-task cost levers the iterator optimizes against (``turn_count``,
+    ``tool_call_count``; cf. experiment.md §22). The full turn-by-turn transcript
+    is not held here — it is persisted alongside the verdict by ``run_eval`` when a
+    ``transcript_path`` is given (TAU2's ``SimulationRun`` JSON).
     """
 
     task_id: str
@@ -53,6 +58,8 @@ class EvalResult:
     agent_cost: Optional[float]
     termination_reason: str
     seed: Optional[int]
+    turn_count: int
+    tool_call_count: int
     timestamp: str
 
 
@@ -80,12 +87,39 @@ def _load_task(domain: str, task_id: str) -> Task:
     raise ValueError(f"Task {task_id!r} not found in domain {domain!r}.")
 
 
+def _transcript_stats(messages) -> Tuple[int, int]:
+    """Per-task cost levers: (turn_count, tool_call_count) from the transcript.
+
+    ``turn_count`` is the number of messages; ``tool_call_count`` sums the tool
+    calls across messages that issued any. Both are 0 when there is no transcript
+    (e.g. full-duplex ticks, or a task that never started).
+    """
+    if not messages:
+        return 0, 0
+    turn_count = len(messages)
+    tool_call_count = sum(
+        len(m.tool_calls) for m in messages if getattr(m, "tool_calls", None)
+    )
+    return turn_count, tool_call_count
+
+
+def _persist_transcript(sim: SimulationRun, path: Path) -> None:
+    """Write the full ``SimulationRun`` transcript to ``path`` as JSON.
+
+    Uses TAU2's own Pydantic v2 serializer (the same call TAU2's ``Results.save``
+    uses); ``audio_content`` is already excluded by the message models.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(sim.model_dump_json(indent=2), encoding="utf-8")
+
+
 def _normalize(
     sim: SimulationRun, *, domain: str, split: str, agent_model: str
 ) -> EvalResult:
     """Convert a raw ``SimulationRun`` into the minimal :class:`EvalResult`."""
     reward = sim.reward_info.reward if sim.reward_info else 0.0
     termination = getattr(sim.termination_reason, "value", sim.termination_reason)
+    turn_count, tool_call_count = _transcript_stats(getattr(sim, "messages", None))
     return EvalResult(
         task_id=sim.task_id,
         domain=domain,
@@ -96,6 +130,8 @@ def _normalize(
         agent_cost=sim.agent_cost,
         termination_reason=str(termination),
         seed=sim.seed,
+        turn_count=turn_count,
+        tool_call_count=tool_call_count,
         timestamp=datetime.now(timezone.utc).isoformat(),
     )
 
@@ -108,6 +144,7 @@ def run_eval(
     seed: Optional[int] = None,
     agent_model: Optional[str] = None,
     llm_args: Optional[dict] = None,
+    transcript_path: Optional[Path] = None,
 ) -> EvalResult:
     """Run one task through TAU2's frozen Orchestrator with our injected agent.
 
@@ -120,6 +157,9 @@ def run_eval(
         agent_model: Override the agent model; defaults to ``config.AGENT_MODEL``.
         llm_args: Override the agent LLM args; defaults to TAU2's agent defaults
             (``temperature=0.0``) for reproducibility.
+        transcript_path: When set, the full ``SimulationRun`` transcript is written
+            here as JSON (the iterator's per-turn cost evidence). The run folder /
+            naming is owned by ``results.logger.transcript_path``.
 
     Returns:
         An :class:`EvalResult` with the reward, pass/fail, and cost verdict.
@@ -164,4 +204,6 @@ def run_eval(
     )
 
     sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+    if transcript_path is not None:
+        _persist_transcript(sim, Path(transcript_path))
     return _normalize(sim, domain=domain, split=split, agent_model=model)
