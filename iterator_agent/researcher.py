@@ -12,11 +12,11 @@ authoritative path check, applied by the orchestrator before any write.
 """
 
 from __future__ import annotations
-import litellm 
+import litellm
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, List, Optional, Tuple, Union
+from typing import Any, Callable, List, Optional, Tuple, Union
 
 import jinja2
 
@@ -106,22 +106,59 @@ def _read_allowed_files(policy: EditPolicy, repo_root: Path) -> List[Tuple[str, 
     return files
 
 
-def _default_complete(prompt: str) -> str:
-    """Default LLM call: LiteLLM with the configured iterator model."""
+# A raw completion returns the provider's response object (LiteLLM-shaped):
+# ``.choices[0].message.content`` plus ``._hidden_params["response_cost"]``.
+RawCompletionFn = Callable[[str], Any]
+
+
+def _litellm_raw(prompt: str) -> Any:
+    """Call LiteLLM with the configured iterator model; return the raw response."""
     model = config.ITERATOR_MODEL
     if not model:
         raise RuntimeError(
             "ITERATOR_MODEL is not set. Define it in .env (see .env.example), "
             "e.g. ITERATOR_MODEL=claude-opus-4-8"
         )
-
-
-    response = litellm.completion(
+    return litellm.completion(
         model=model,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.0,
     )
+
+
+def _content_of(response: Any) -> str:
+    """Extract the assistant text from a LiteLLM-shaped response."""
     return response.choices[0].message.content or ""  # type: ignore[union-attr]
+
+
+def _response_cost(response: Any) -> float:
+    """Read LiteLLM's per-call ``response_cost`` (USD); 0.0 when unavailable."""
+    hidden = getattr(response, "_hidden_params", None)
+    cost = hidden.get("response_cost") if isinstance(hidden, dict) else None
+    return float(cost) if cost else 0.0
+
+
+class CostTrackingCompletion:
+    """A ``str -> str`` completion that sums LiteLLM ``response_cost`` across calls.
+
+    This is how the iterator's **search cost** is measured (experiment.md §15.3):
+    the orchestrator uses one instance for an iteration's editor calls, then reads
+    :attr:`total_cost_usd`. The raw call is injectable so tests run at $0.
+    """
+
+    def __init__(self, raw: Optional[RawCompletionFn] = None) -> None:
+        self._raw = raw if raw is not None else _litellm_raw
+        self.total_cost_usd = 0.0
+
+    def __call__(self, prompt: str) -> str:
+        response = self._raw(prompt)
+        self.total_cost_usd += _response_cost(response)
+        return _content_of(response)
+
+
+def _default_complete(prompt: str) -> str:
+    """Default LLM call: LiteLLM with the configured iterator model (no cost tracking)."""
+    return _content_of(_litellm_raw(prompt))
 
 
 def run_editor(

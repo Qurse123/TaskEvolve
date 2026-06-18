@@ -231,6 +231,52 @@ def test_accept_invokes_commit_hook(tmp_path: Path) -> None:
     assert committed == ["iter_0001"]
 
 
+class _CostingComplete:
+    """A two-call editor stub that also reports accumulated search cost."""
+
+    def __init__(self, proposal_json: str, cost_per_call: float = 0.01) -> None:
+        self._json = proposal_json
+        self._cost = cost_per_call
+        self.total_cost_usd = 0.0
+        self._n = 0
+
+    def __call__(self, prompt: str) -> str:
+        self._n += 1
+        self.total_cost_usd += self._cost
+        return "diagnosis text" if self._n == 1 else self._json
+
+
+def test_records_editor_search_cost(tmp_path: Path) -> None:
+    # Arrange
+    eval_fn, _ = _eval_counter(
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.069),
+    )
+    complete = _CostingComplete(_proposal_json(), cost_per_call=0.015)
+
+    # Act
+    result = _run(tmp_path, complete=complete, eval_fn=eval_fn)
+    record = json.loads(result.record_path.read_text(encoding="utf-8"))
+
+    # Assert: two editor calls x $0.015 = $0.03 of iterator search cost.
+    assert result.search_cost_usd == pytest.approx(0.03)
+    assert record["iterator_search_cost_usd"] == pytest.approx(0.03)
+
+
+def test_search_cost_zero_when_completion_untracked(tmp_path: Path) -> None:
+    # Arrange: a plain function complete (no total_cost_usd attribute).
+    eval_fn, _ = _eval_counter(
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.069),
+    )
+
+    # Act
+    result = _run(tmp_path, complete=_fake_complete(_proposal_json()), eval_fn=eval_fn)
+
+    # Assert
+    assert result.search_cost_usd == 0.0
+
+
 def test_reject_does_not_invoke_commit_hook(tmp_path: Path) -> None:
     # Arrange
     eval_fn, _ = _eval_counter(
