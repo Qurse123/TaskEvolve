@@ -204,7 +204,7 @@ Two complementary layers serve different audiences.
 
 **Per-turn debugging — local files (Langfuse removed in M2):**
 
-The project originally wired Langfuse (LiteLLM `langfuse_otel` callback) for per-call traces. It was **removed in Milestone 2**: nothing in the metric pipeline depended on it (the headline `cost_per_successful_task` comes from TAU2's accounting in `results.csv`), it added an external service + API keys, and for debugging the iterator, local files are simpler, greppable, in-git, and deterministic. When per-turn detail is needed ("why did the agent call the wrong tool on turn 6?"), persist TAU2's `SimulationRun` transcript into the run folder; the iterator itself is debugged from its per-iteration log folders, not a hosted UI.
+The project originally wired Langfuse (LiteLLM `langfuse_otel` callback) for per-call traces. It was **removed in Milestone 2**: nothing in the metric pipeline depended on it (the headline `cost_per_successful_task` comes from TAU2's accounting in `results.csv`), it added an external service + API keys, and for debugging the iterator, local files are simpler, greppable, in-git, and deterministic. In its place, TAU2's `SimulationRun` transcript is persisted for **every** task as `task_<id>_messages.json` in the run folder — this is the iterator's primary cost evidence (turn-by-turn behavior across all tasks, not just failures), not merely an occasional debugging aid. The iterator itself is debugged from its per-iteration log folders (`experiments/iterations/`), not a hosted UI.
 
 **Structured JSON task log — for the iterator agent:**
 
@@ -214,8 +214,10 @@ The project originally wired Langfuse (LiteLLM `langfuse_otel` callback) for per
 experiments/
   logs/
     proxy_20260529_143022/       ← run_id = <split>_<YYYYMMDD>_<HHMMSS>
-      task_retail_001.json
+      task_retail_001.json              ← verdict + cost levers
+      task_retail_001_messages.json     ← full SimulationRun transcript (iterator cost evidence)
       task_retail_002.json
+      task_retail_002_messages.json
       ...
       run_summary.json
     proxy_20260529_162511/       ← second proxy run (different seed, for double-run confirmation)
@@ -237,16 +239,14 @@ Each task JSON:
   "cost_usd": 0.14,
   "termination_reason": "max_steps",
   "seed": 300,
-  "latency_ms": 8421,
   "turn_count": 8,
   "tool_call_count": 5,
-  "invalid_action_count": 0,
   "timestamp": "2026-05-29T10:32:00+00:00",
   "run_id": "proxy_20260529_143022"
 }
 ```
 
-The per-task JSON is **verdict-only** — reward, pass/fail, cost, and identity. Per-turn detail (prompts, responses, tool steps) is **not** duplicated here; when needed it can be recovered from TAU2's `SimulationRun` transcript (persisted locally). This keeps our logs minimal.
+The per-task JSON holds the verdict (reward, pass/fail, cost, identity) **plus the two per-task cost levers** the iterator optimizes against — `turn_count` and `tool_call_count` (cf. `experiment.md §22`). The full turn-by-turn detail (prompts, responses, tool steps) is not inlined here; it lives in the paired `task_<id>_messages.json` transcript written for every task. `feedback.py` reads both: the verdicts/levers become a per-task cost table and the transcripts become compact digests of the costliest tasks.
 
 `run_summary.json` contains aggregate metrics for the run. `results.csv` appends one summary row per run. The iterator reads the most recent run folder for a given split to generate its feedback.
 
@@ -255,13 +255,13 @@ The per-task JSON is **verdict-only** — reward, pass/fail, cost, and identity.
 Not built in Milestone 1. Architecture described here for planning continuity.
 
 The iterator is a separate Python process that:
-1. Reads the most recent proxy run folder in `experiments/logs/`
-2. Identifies failure patterns across tasks
-3. Proposes exactly one change to one file in the allowed edit surface
+1. Reads the most recent proxy run folder in `experiments/logs/` (verdicts + per-task transcripts)
+2. Builds cost-centric feedback across **all** tasks — a per-task cost table (cost, turns, tool calls) plus turn-by-turn digests of the costliest tasks — since cost waste appears in passing tasks too, not just failures
+3. Proposes exactly one change to one file in the allowed edit surface (only the editor calls an LLM)
 4. Validates against `allowed_edits.yaml` — rejects if the change touches frozen files
-5. Runs proxy eval (seed A) and checks if aggregate reward improved over current best
+5. Runs proxy eval (seed A) and checks if **cost per successful task** improved over the current-best proxy distribution (with task success held at or above the guardrail floor)
 6. If improved: runs proxy eval again (seed B) to confirm the gain is not noise
-7. If both runs show improvement against the current proxy baseline distribution without crossing cost, policy, invalid-action, or latency guardrails: commits the change
+7. If both runs improve against the current proxy distribution without crossing the success-floor, cost, policy, or invalid-action guardrails: commits the change (bumps `HARNESS_VERSION`, writes the per-iteration note)
 8. If either run does not show improvement (or crosses a guardrail): reverts
 9. Repeats until the optimization budget is exhausted
 
@@ -363,7 +363,7 @@ TaskEvolve/
 3. `benchmark/splits.py` — generate and write split JSON files from TAU2-bench task lists
 4. `target_agent/agent.py` — minimal `TaskEvolveAgent` using TAU2's `generate()` utility
 5. `target_agent/prompts/system_prompt.j2` — initial agent system prompt (Jinja2)
-6. `benchmark/adapter.py` — `run_eval()` injects `TaskEvolveAgent` into TAU2's `Orchestrator`, runs `run_simulation()` (frozen evaluator), returns a verdict-only `EvalResult`
+6. `benchmark/adapter.py` — `run_eval()` injects `TaskEvolveAgent` into TAU2's `Orchestrator`, runs `run_simulation()` (frozen evaluator), returns an `EvalResult` (verdict + `turn_count`/`tool_call_count` cost levers), and persists the task transcript when given a `transcript_path`
 7. ~~`target_agent/traces/langfuse_setup.py`~~ — Langfuse wiring (built in M1, **removed in M2**; observability is local files only)
 8. `results/logger.py` — per-run folder JSON task log writer
 9. Generate `benchmark/splits/*.json` once and freeze the task IDs before any paid benchmark run
@@ -390,7 +390,7 @@ cd vendor/tau2-bench && uv sync --extra knowledge --extra gym --extra dev
 
 OpenTelemetry is a distributed tracing standard for microservices. It requires a collector process, an OTLP exporter, and span context propagation across service boundaries.
 
-Our system is a single Python process. The iterator agent's feedback loop needs the per-task **verdict** (reward, pass/fail, cost), which we write to a flat per-task JSON file. Richer per-turn detail (which tool was called, which turn failed, the prompt/response), when needed, is recovered from TAU2's `SimulationRun` transcript persisted to the same run folder — no separate tracing service.
+Our system is a single Python process. The iterator agent's feedback loop needs the per-task **verdict + cost levers** (reward, pass/fail, cost, turns, tool calls), which we write to a flat per-task JSON file, plus the per-turn detail (which tool was called, which turn failed, the prompt/response), which lives in the TAU2 `SimulationRun` transcript persisted per task to the same run folder — no separate tracing service.
 
 For occasional LLM-call-level inspection (prompts, tokens, cost), the local transcript plus LiteLLM's per-call `response_cost` are sufficient and stay in-repo. We deliberately avoid a hosted tracing service — **Langfuse was removed in M2** — to keep the stack local, deterministic, greppable, and free of external keys.
 
