@@ -118,10 +118,13 @@ def run_iteration(
     # wrapper measures the iterator's search cost (experiment.md §15.3); an injected
     # `complete` keeps it as-is (tracked iff it exposes `total_cost_usd`).
     editor_complete = complete if complete is not None else CostTrackingCompletion()
+    cost_before = float(getattr(editor_complete, "total_cost_usd", 0.0))
     proposal = run_editor(
         feedback, policy=policy, complete=editor_complete, repo_root=repo_root
     )
-    search_cost = float(getattr(editor_complete, "total_cost_usd", 0.0))
+    # Per-iteration delta, so a tracker reused across iterations (the driver) still
+    # attributes only this iteration's editor cost.
+    search_cost = float(getattr(editor_complete, "total_cost_usd", 0.0)) - cost_before
 
     # 4-5. Allowed Change Check — a forbidden target is rejected before any eval.
     guard = evaluate(proposal.target_file, policy)
