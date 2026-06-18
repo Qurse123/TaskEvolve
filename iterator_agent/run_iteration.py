@@ -44,7 +44,12 @@ from iterator_agent.iteration_log import (
     append_changelog,
     write_record,
 )
-from iterator_agent.researcher import CompletionFn, ProposedEdit, run_editor
+from iterator_agent.researcher import (
+    CompletionFn,
+    CostTrackingCompletion,
+    ProposedEdit,
+    run_editor,
+)
 from results.logger import DEFAULT_LOGS_ROOT
 from settings import config
 
@@ -64,6 +69,7 @@ class IterationResult:
     record: IterationRecord
     proposed_edit: ProposedEdit
     harness_version: str  # version after this iteration (bumped iff accepted)
+    search_cost_usd: float  # editor LLM cost for this iteration (experiment.md §15.3)
     record_path: Path
     changelog_path: Path
 
@@ -108,8 +114,14 @@ def run_iteration(
     if feedback is None:
         feedback = build_feedback(split, logs_root=logs_root)
 
-    # 3. Editor proposes exactly one change (the only LLM step).
-    proposal = run_editor(feedback, policy=policy, complete=complete, repo_root=repo_root)
+    # 3. Editor proposes exactly one change (the only LLM step). A cost-tracking
+    # wrapper measures the iterator's search cost (experiment.md §15.3); an injected
+    # `complete` keeps it as-is (tracked iff it exposes `total_cost_usd`).
+    editor_complete = complete if complete is not None else CostTrackingCompletion()
+    proposal = run_editor(
+        feedback, policy=policy, complete=editor_complete, repo_root=repo_root
+    )
+    search_cost = float(getattr(editor_complete, "total_cost_usd", 0.0))
 
     # 4-5. Allowed Change Check — a forbidden target is rejected before any eval.
     guard = evaluate(proposal.target_file, policy)
@@ -118,8 +130,9 @@ def run_iteration(
         return _persist(
             iteration_id=iteration_id, accepted=False, decision=decision,
             proposal=proposal, runs=(), seeds=(), best=best,
-            harness_version=current_version, iterations_root=iterations_root,
-            experiments_dir=experiments_dir, commit=commit,
+            harness_version=current_version, search_cost=search_cost,
+            iterations_root=iterations_root, experiments_dir=experiments_dir,
+            commit=commit,
         )
 
     # 6. Apply the change; tag candidate evals with the bumped version.
@@ -141,8 +154,9 @@ def run_iteration(
     return _persist(
         iteration_id=iteration_id, accepted=decision.accepted, decision=decision,
         proposal=proposal, runs=runs, seeds=seeds_used, best=best,
-        harness_version=result_version, iterations_root=iterations_root,
-        experiments_dir=experiments_dir, commit=commit,
+        harness_version=result_version, search_cost=search_cost,
+        iterations_root=iterations_root, experiments_dir=experiments_dir,
+        commit=commit,
     )
 
 
@@ -178,6 +192,7 @@ def _persist(
     seeds: Tuple[int, ...],
     best: Distribution,
     harness_version: str,
+    search_cost: float,
     iterations_root: Union[str, Path],
     experiments_dir: Union[str, Path],
     commit: Optional[Callable[[IterationResult], None]],
@@ -201,6 +216,7 @@ def _persist(
         cost_per_successful_task_after=after_cost,
         accepted_or_rejected="accepted" if accepted else "rejected",
         reason_accepted_or_rejected=decision.reason,
+        iterator_search_cost_usd=search_cost,
     )
     record_path = write_record(record, logs_root=iterations_root)
     changelog_path = append_changelog(record, experiments_dir=experiments_dir)
@@ -212,6 +228,7 @@ def _persist(
         record=record,
         proposed_edit=proposal,
         harness_version=harness_version,
+        search_cost_usd=search_cost,
         record_path=record_path,
         changelog_path=changelog_path,
     )

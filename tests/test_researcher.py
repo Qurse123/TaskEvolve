@@ -9,11 +9,14 @@ Run from the repo root:
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from iterator_agent.edit_guard import EditPolicy
 from iterator_agent.feedback import FeedbackSummary, TaskRecord
 from iterator_agent.researcher import (
+    CostTrackingCompletion,
     ProposedEdit,
     parse_proposal,
     render_diagnose,
@@ -120,3 +123,28 @@ def test_run_editor_returns_proposed_edit(tmp_path):
     # Two LLM calls: diagnose then propose; the propose prompt saw the old file.
     assert len(fake.prompts) == 2
     assert "OLD PROMPT" in fake.prompts[1]
+
+
+def _fake_response(content: str, cost):
+    """A LiteLLM-shaped response object: message content + hidden cost param."""
+    hidden = {"response_cost": cost} if cost is not None else {}
+    message = SimpleNamespace(content=content)
+    return SimpleNamespace(choices=[SimpleNamespace(message=message)], _hidden_params=hidden)
+
+
+def test_cost_tracking_completion_accumulates_response_cost():
+    raw = iter([_fake_response("diagnosis", 0.01), _fake_response("proposal", 0.02)])
+    complete = CostTrackingCompletion(raw=lambda prompt: next(raw))
+
+    first = complete("p1")
+    second = complete("p2")
+
+    assert (first, second) == ("diagnosis", "proposal")
+    assert complete.total_cost_usd == pytest.approx(0.03)
+
+
+def test_cost_tracking_completion_treats_missing_cost_as_zero():
+    complete = CostTrackingCompletion(raw=lambda prompt: _fake_response("text", None))
+
+    assert complete("p") == "text"
+    assert complete.total_cost_usd == 0.0
