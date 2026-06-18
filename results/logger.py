@@ -98,6 +98,16 @@ def start_run(
     return RunLog(run_id=run_id, run_dir=run_dir, split=split)
 
 
+def transcript_path(run: RunLog, task_id: str) -> Path:
+    """Path for a task's full transcript, beside its verdict file.
+
+    ``benchmark.adapter.run_eval`` writes the ``SimulationRun`` JSON here when asked;
+    naming mirrors :func:`log_task` (``task_<id>.json`` -> ``task_<id>_messages.json``)
+    so the verdict and its transcript stay paired in the run folder.
+    """
+    return run.run_dir / f"task_{_safe(task_id)}_messages.json"
+
+
 def log_task(run: RunLog, result: "EvalResult") -> Path:
     """Write the verdict JSON for a single task. Returns the file path."""
     record = _task_record(result, run.run_id)
@@ -144,6 +154,8 @@ def _task_record(result: "EvalResult", run_id: str) -> dict:
         "reward": result.reward,
         "passed": result.passed,
         "cost_usd": result.agent_cost,
+        "turn_count": result.turn_count,
+        "tool_call_count": result.tool_call_count,
         "termination_reason": result.termination_reason,
         "seed": result.seed,
         "timestamp": result.timestamp,
