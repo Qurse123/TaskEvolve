@@ -114,7 +114,7 @@ def _run(tmp_path: Path, *, complete, eval_fn, **overrides):
         feedback=_feedback(),
         complete=complete,
         eval_seed=eval_fn,
-        current_version="v0.1",
+        current_version=overrides.pop("current_version", "v0.1"),
         iterations_root=tmp_path / "iterations",
         experiments_dir=tmp_path / "experiments",
         **overrides,
@@ -209,6 +209,23 @@ def test_rejects_forbidden_target_without_running_eval(tmp_path: Path) -> None:
     assert calls["n"] == 0  # guard blocks before any eval
     assert not (tmp_path / "benchmark" / "adapter.py").exists()
     assert (tmp_path / "experiments" / "rejected_changes.md").exists()
+
+
+def test_malformed_harness_version_fails_before_edit_or_eval(tmp_path: Path) -> None:
+    eval_fn, calls = _eval_counter(
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071),
+    )
+
+    with pytest.raises(ValueError, match="vMAJOR.MINOR"):
+        _run(
+            tmp_path,
+            complete=_fake_complete(_proposal_json()),
+            eval_fn=eval_fn,
+            current_version="draft",
+        )
+
+    assert calls["n"] == 0
+    assert (tmp_path / ALLOWED_TARGET).read_text() == ORIGINAL_CONTENT
 
 
 def test_accept_invokes_commit_hook(tmp_path: Path) -> None:
