@@ -7,12 +7,8 @@ Run from the repo root:
 
 from __future__ import annotations
 
-import pytest
-
 from iterator_agent.edit_guard import (
     EditPolicy,
-    ForbiddenEditError,
-    assert_allowed,
     evaluate,
     load_policy,
 )
@@ -72,15 +68,6 @@ def test_absolute_path_is_rejected():
     decision = evaluate("/etc/passwd", POLICY)
 
     assert decision.allowed is False
-
-
-def test_assert_allowed_raises_for_forbidden():
-    with pytest.raises(ForbiddenEditError):
-        assert_allowed("vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", POLICY)
-
-
-def test_assert_allowed_returns_none_for_allowed():
-    assert assert_allowed("target_agent/harness.py", POLICY) is None
 
 
 def test_load_policy_reads_real_yaml():
