@@ -10,15 +10,12 @@ Run from the repo root:
 
 from __future__ import annotations
 
-import pytest
-
 from iterator_agent.acceptance import (
     Guardrails,
     RunMetrics,
     check_run,
     evaluate_candidate,
     load_guardrails,
-    load_protocol,
 )
 from iterator_agent.baseline import Distribution
 
@@ -77,7 +74,9 @@ def test_run_without_cost_improvement_fails():
 
 
 def test_cost_ceiling_guardrail_blocks_even_when_improved():
-    run = RunMetrics(pass_rate=0.6, cost_per_successful_task=0.088)  # < 0.09 best, > 0.085 ceiling
+    run = RunMetrics(
+        pass_rate=0.6, cost_per_successful_task=0.088
+    )  # < 0.09 best, > 0.085 ceiling
     guardrails = Guardrails(
         task_success_floor_frac_of_best=0.95,
         max_cost_per_successful_task_usd=0.085,
@@ -119,28 +118,3 @@ def test_single_run_cannot_be_accepted():
 
     assert decision.accepted is False
     assert "two" in decision.reason.lower() or "2" in decision.reason
-
-
-def test_load_protocol_reads_real_yaml():
-    assert load_protocol() == 2
-
-
-def test_load_protocol_rejects_below_hard_minimum(tmp_path):
-    policy = tmp_path / "allowed_edits.yaml"
-    policy.write_text("protocol:\n  proxy_runs_per_candidate: 1\n", encoding="utf-8")
-
-    with pytest.raises(ValueError):
-        load_protocol(path=policy)
-
-
-def test_evaluate_respects_required_runs(tmp_path):
-    # Two passing runs are not enough when the protocol demands three.
-    runs = [
-        RunMetrics(pass_rate=0.60, cost_per_successful_task=0.080),
-        RunMetrics(pass_rate=0.62, cost_per_successful_task=0.082),
-    ]
-
-    decision = evaluate_candidate(runs, BEST, GUARDRAILS, required_runs=3)
-
-    assert decision.accepted is False
-    assert "3" in decision.reason

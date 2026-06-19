@@ -131,10 +131,17 @@ def run_iteration(
     if not guard.allowed:
         decision = AcceptanceDecision(False, f"rejected: {guard.reason}", ())
         return _persist(
-            iteration_id=iteration_id, accepted=False, decision=decision,
-            proposal=proposal, runs=(), seeds=(), best=best,
-            harness_version=current_version, search_cost=search_cost,
-            iterations_root=iterations_root, experiments_dir=experiments_dir,
+            iteration_id=iteration_id,
+            accepted=False,
+            decision=decision,
+            proposal=proposal,
+            runs=(),
+            seeds=(),
+            best=best,
+            harness_version=current_version,
+            search_cost=search_cost,
+            iterations_root=iterations_root,
+            experiments_dir=experiments_dir,
             commit=commit,
         )
 
@@ -155,10 +162,17 @@ def run_iteration(
         result_version = current_version
 
     return _persist(
-        iteration_id=iteration_id, accepted=decision.accepted, decision=decision,
-        proposal=proposal, runs=runs, seeds=seeds_used, best=best,
-        harness_version=result_version, search_cost=search_cost,
-        iterations_root=iterations_root, experiments_dir=experiments_dir,
+        iteration_id=iteration_id,
+        accepted=decision.accepted,
+        decision=decision,
+        proposal=proposal,
+        runs=runs,
+        seeds=seeds_used,
+        best=best,
+        harness_version=result_version,
+        search_cost=search_cost,
+        iterations_root=iterations_root,
+        experiments_dir=experiments_dir,
         commit=commit,
     )
 
@@ -175,7 +189,9 @@ def _run_double(
     if not check_a.passed:
         # 8. Short-circuit: don't spend seed B when the first run already fails.
         decision = AcceptanceDecision(
-            False, f"rejected: first proxy run did not improve — {check_a.reason}", (check_a,)
+            False,
+            f"rejected: first proxy run did not improve — {check_a.reason}",
+            (check_a,),
         )
         return (run_a,), (seeds[0],), decision
 
@@ -247,7 +263,11 @@ def _after_stats(runs: Sequence[RunMetrics]) -> Tuple[float, float, Optional[flo
     pass_rates = [r.pass_rate for r in runs]
     mean = statistics.mean(pass_rates)
     std = statistics.stdev(pass_rates) if len(pass_rates) > 1 else 0.0
-    costs = [r.cost_per_successful_task for r in runs if r.cost_per_successful_task is not None]
+    costs = [
+        r.cost_per_successful_task
+        for r in runs
+        if r.cost_per_successful_task is not None
+    ]
     cost = statistics.mean(costs) if costs else None
     return mean, std, cost
 
@@ -275,7 +295,7 @@ def _bump_version(version: str) -> str:
     """Increment a ``vMAJOR.MINOR`` label's minor component (``v0.1`` -> ``v0.2``)."""
     match = _VERSION_RE.match(version)
     if not match:
-        return f"{version}+1"
+        raise ValueError(f"harness version must match vMAJOR.MINOR, got {version!r}")
     major, minor = int(match.group(1)), int(match.group(2))
     return f"v{major}.{minor + 1}"
 
