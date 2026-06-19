@@ -4,7 +4,7 @@ No LLM. A candidate harness change is accepted iff BOTH of its proxy runs
 **improve** the objective (``cost_per_successful_task`` strictly below the
 current-best mean) AND **clear every guardrail** (success floor + optional cost /
 invalid-action ceilings declared in ``allowed_edits.yaml``). Otherwise the change
-is reverted. Keeping this a plain rule 
+is reverted.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import yaml
 from iterator_agent.baseline import Distribution
 from iterator_agent.edit_guard import DEFAULT_POLICY_PATH
 
-HARD_MIN_RUNS = 2
+REQUIRED_PROXY_RUNS = 2
 
 
 @dataclass(frozen=True)
@@ -66,29 +66,16 @@ def load_guardrails(path: Union[str, Path] = DEFAULT_POLICY_PATH) -> Guardrails:
     block = data.get("guardrails") or {}
     floor = block.get("task_success_floor_frac_of_best")
     if floor is None:
-        raise ValueError(f"guardrails.task_success_floor_frac_of_best missing from {path}")
+        raise ValueError(
+            f"guardrails.task_success_floor_frac_of_best missing from {path}"
+        )
     return Guardrails(
         task_success_floor_frac_of_best=float(floor),
-        max_cost_per_successful_task_usd=_opt_float(block.get("max_cost_per_successful_task_usd")),
+        max_cost_per_successful_task_usd=_opt_float(
+            block.get("max_cost_per_successful_task_usd")
+        ),
         max_invalid_action_rate=_opt_float(block.get("max_invalid_action_rate")),
     )
-
-
-def load_protocol(path: Union[str, Path] = DEFAULT_POLICY_PATH) -> int:
-    """Load proxy_runs_per_candidate, enforcing the double-run hard floor.
-
-    Raises ValueError if the configured count is below :data:`HARD_MIN_RUNS`, so
-    the contract can only strengthen the double-run rule, never weaken it.
-    """
-    data = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
-    block = data.get("protocol") or {}
-    runs = int(block.get("proxy_runs_per_candidate", HARD_MIN_RUNS))
-    if runs < HARD_MIN_RUNS:
-        raise ValueError(
-            f"protocol.proxy_runs_per_candidate={runs} violates the double-run rule "
-            f"(must be >= {HARD_MIN_RUNS}); see experiment.md §21 / Hard Constraints #6"
-        )
-    return runs
 
 
 def check_run(run: RunMetrics, best: Distribution, guardrails: Guardrails) -> RunCheck:
@@ -97,7 +84,9 @@ def check_run(run: RunMetrics, best: Distribution, guardrails: Guardrails) -> Ru
     if best.cost_per_successful_task_mean is None:
         return RunCheck(False, "cannot judge improvement: best has no cost baseline")
     if run.cost_per_successful_task is None:
-        return RunCheck(False, "no cost improvement: run reported no cost per successful task")
+        return RunCheck(
+            False, "no cost improvement: run reported no cost per successful task"
+        )
     if not (run.cost_per_successful_task < best.cost_per_successful_task_mean):
         return RunCheck(
             False,
@@ -140,16 +129,14 @@ def evaluate_candidate(
     runs: Sequence[RunMetrics],
     best: Distribution,
     guardrails: Guardrails,
-    *,
-    required_runs: int = HARD_MIN_RUNS,
 ) -> AcceptanceDecision:
-    """Apply the double-run rule: accept iff there are ``required_runs`` runs and all pass."""
+    """Apply the double-run rule: accept iff exactly two proxy runs are present and pass."""
     checks = tuple(check_run(run, best, guardrails) for run in runs)
 
-    if len(runs) < required_runs:
+    if len(runs) != REQUIRED_PROXY_RUNS:
         return AcceptanceDecision(
             False,
-            f"rejected: the double-run rule needs {required_runs} proxy runs, got {len(runs)}",
+            f"rejected: the double-run rule needs {REQUIRED_PROXY_RUNS} proxy runs, got {len(runs)}",
             checks,
         )
 

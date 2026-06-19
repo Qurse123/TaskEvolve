@@ -20,10 +20,6 @@ import yaml
 DEFAULT_POLICY_PATH = Path(__file__).parent / "allowed_edits.yaml"
 
 
-class ForbiddenEditError(Exception):
-    """Raised when a proposed edit targets a path outside the allowed surface."""
-
-
 @dataclass(frozen=True)
 class EditPolicy:
     """The allowed edit surface: an exact allow-list plus frozen prefixes."""
@@ -64,7 +60,9 @@ def evaluate(target: Union[str, Path], policy: EditPolicy) -> EditDecision:
 
     # An absolute path or one that climbs out of the repo root is never allowed.
     if os.path.isabs(raw) or norm == ".." or norm.startswith("../"):
-        return EditDecision(norm, False, f"rejected: path escapes the repo root: {raw!r}")
+        return EditDecision(
+            norm, False, f"rejected: path escapes the repo root: {raw!r}"
+        )
 
     if norm in policy.allowed_paths:
         return EditDecision(norm, True, "allowed: in the editable harness surface")
@@ -74,14 +72,8 @@ def evaluate(target: Union[str, Path], policy: EditPolicy) -> EditDecision:
         # slash (e.g. "vendor/tau2-bench/") matches the same as a loaded one.
         norm_prefix = _normalize(prefix)
         if norm == norm_prefix or norm.startswith(norm_prefix + "/"):
-            return EditDecision(norm, False, f"rejected: frozen path (matches {prefix!r})")
+            return EditDecision(
+                norm, False, f"rejected: frozen path (matches {prefix!r})"
+            )
 
     return EditDecision(norm, False, "rejected: outside the allowed edit surface")
-
-
-def assert_allowed(target: Union[str, Path], policy: EditPolicy) -> None:
-    """Raise :class:`ForbiddenEditError` unless ``target`` may be edited."""
-    decision = evaluate(target, policy)
-    if not decision.allowed:
-        raise ForbiddenEditError(decision.reason)
-    return None
