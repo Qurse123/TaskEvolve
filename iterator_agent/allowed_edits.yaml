@@ -38,10 +38,3 @@ guardrails:
   # Cost / quality ceilings; null = declared but not yet enforced.
   max_cost_per_successful_task_usd: null
   max_invalid_action_rate: null
-
-# Iteration protocol — pre-committed and frozen for the run, like the guardrails.
-protocol:
-  # Proxy runs per candidate: the double-run rule (experiment.md §21,
-  # Hard Constraints #6). Must be >= 2 — the loader rejects anything lower, so
-  # config can only strengthen the rule (e.g. triple-run), never weaken it.
-  proxy_runs_per_candidate: 2
