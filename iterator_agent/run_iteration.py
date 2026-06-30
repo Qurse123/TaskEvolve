@@ -19,6 +19,7 @@ the driver's job (``scripts/run_iterator.py``).
 
 from __future__ import annotations
 
+import difflib
 import re
 import statistics
 from dataclasses import dataclass
@@ -42,6 +43,7 @@ from iterator_agent.iteration_log import (
     DEFAULT_ITERATIONS_ROOT,
     IterationRecord,
     append_changelog,
+    write_artifact,
     write_record,
 )
 from iterator_agent.researcher import (
@@ -87,6 +89,7 @@ def run_iteration(
     complete: Optional[CompletionFn] = None,
     eval_seed: Optional[EvalSeedFn] = None,
     current_version: Optional[str] = None,
+    history: Sequence[IterationRecord] = (),
     iterations_root: Union[str, Path] = DEFAULT_ITERATIONS_ROOT,
     experiments_dir: Union[str, Path] = DEFAULT_EXPERIMENTS_DIR,
     logs_root: Union[str, Path] = DEFAULT_LOGS_ROOT,
@@ -112,15 +115,28 @@ def run_iteration(
     if best is None:
         best = load_distribution(split, current_version)
     if feedback is None:
-        feedback = build_feedback(split, logs_root=logs_root)
+        # Diagnose the CURRENT-BEST harness's latest run (not whatever ran last, which
+        # mid-loop is the previous rejected candidate) — see feedback.build_feedback.
+        feedback = build_feedback(
+            split, harness_version=current_version, logs_root=logs_root
+        )
+
+    # Provenance: the models in play this iteration (experiment.md §22).
+    editor_model = config.ITERATOR_MODEL or ""
+    agent_model = config.AGENT_MODEL or ""
 
     # 3. Editor proposes exactly one change (the only LLM step). A cost-tracking
     # wrapper measures the iterator's search cost (experiment.md §15.3); an injected
-    # `complete` keeps it as-is (tracked iff it exposes `total_cost_usd`).
+    # `complete` keeps it as-is (tracked iff it exposes `total_cost_usd`). `history`
+    # (prior accepted+rejected records) gives the editor memory of what it has tried.
     editor_complete = complete if complete is not None else CostTrackingCompletion()
     cost_before = float(getattr(editor_complete, "total_cost_usd", 0.0))
     proposal = run_editor(
-        feedback, policy=policy, complete=editor_complete, repo_root=repo_root
+        feedback,
+        policy=policy,
+        complete=editor_complete,
+        repo_root=repo_root,
+        history=history,
     )
     # Per-iteration delta, so a tracker reused across iterations (the driver) still
     # attributes only this iteration's editor cost.
@@ -140,6 +156,9 @@ def run_iteration(
             best=best,
             harness_version=current_version,
             search_cost=search_cost,
+            original=None,
+            editor_model=editor_model,
+            agent_model=agent_model,
             iterations_root=iterations_root,
             experiments_dir=experiments_dir,
             commit=commit,
@@ -171,6 +190,9 @@ def run_iteration(
         best=best,
         harness_version=result_version,
         search_cost=search_cost,
+        original=original,
+        editor_model=editor_model,
+        agent_model=agent_model,
         iterations_root=iterations_root,
         experiments_dir=experiments_dir,
         commit=commit,
@@ -212,11 +234,14 @@ def _persist(
     best: Distribution,
     harness_version: str,
     search_cost: float,
+    original: Optional[str],
+    editor_model: str,
+    agent_model: str,
     iterations_root: Union[str, Path],
     experiments_dir: Union[str, Path],
     commit: Optional[Callable[[IterationResult], None]],
 ) -> IterationResult:
-    """Build the §22 record, write it + the changelog, fire the commit hook on accept."""
+    """Build the §22 record, write it + the changelog + the change diff, commit on accept."""
     after_mean, after_std, after_cost = _after_stats(runs)
     record = IterationRecord(
         iteration_id=iteration_id,
@@ -236,9 +261,19 @@ def _persist(
         accepted_or_rejected="accepted" if accepted else "rejected",
         reason_accepted_or_rejected=decision.reason,
         iterator_search_cost_usd=search_cost,
+        editor_model=editor_model,
+        agent_model=agent_model,
     )
     record_path = write_record(record, logs_root=iterations_root)
     changelog_path = append_changelog(record, experiments_dir=experiments_dir)
+    # Persist the exact edit (accepted AND rejected) so the change survives a revert
+    # and the user can audit what the iterator tried on each file (user: track changes).
+    write_artifact(
+        iteration_id,
+        "change.diff",
+        _unified_diff(original, proposal.new_content, proposal.target_file),
+        logs_root=iterations_root,
+    )
 
     result = IterationResult(
         iteration_id=iteration_id,
@@ -270,6 +305,15 @@ def _after_stats(runs: Sequence[RunMetrics]) -> Tuple[float, float, Optional[flo
     ]
     cost = statistics.mean(costs) if costs else None
     return mean, std, cost
+
+
+def _unified_diff(original: Optional[str], new_content: str, target: str) -> str:
+    """Unified diff of a file's prior content → proposed content (for change tracking)."""
+    before = (original or "").splitlines(keepends=True)
+    after = new_content.splitlines(keepends=True)
+    return "".join(
+        difflib.unified_diff(before, after, fromfile=f"a/{target}", tofile=f"b/{target}")
+    )
 
 
 def _apply_edit(repo_root: Path, target: str, new_content: str) -> Optional[str]:

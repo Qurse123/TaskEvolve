@@ -16,13 +16,16 @@ import litellm
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, List, Optional, Sequence, Tuple, Union
 
 import jinja2
 
 from iterator_agent.edit_guard import EditPolicy, load_policy
 from iterator_agent.feedback import FeedbackSummary
 from settings import config
+
+if TYPE_CHECKING:
+    from iterator_agent.iteration_log import IterationRecord
 
 # A pluggable text-completion call: prompt in, model response out.
 CompletionFn = Callable[[str], str]
@@ -48,9 +51,15 @@ class ProposedEdit:
     reason_for_change: str
 
 
-def render_diagnose(feedback: FeedbackSummary) -> str:
-    """Render the failure-analysis prompt from a feedback summary."""
-    return _JINJA.get_template("diagnose.j2").render(s=feedback).strip()
+def render_diagnose(
+    feedback: FeedbackSummary, history: Sequence["IterationRecord"] = ()
+) -> str:
+    """Render the failure-analysis prompt from a feedback summary + prior changes.
+
+    ``history`` is every earlier iteration's record (accepted + rejected) this run,
+    so the editor can avoid re-proposing rejected ideas and build on accepted ones.
+    """
+    return _JINJA.get_template("diagnose.j2").render(s=feedback, history=history).strip()
 
 
 def render_propose(diagnosis: str, allowed_files: List[Tuple[str, str]]) -> str:
@@ -167,12 +176,17 @@ def run_editor(
     policy: Optional[EditPolicy] = None,
     complete: Optional[CompletionFn] = None,
     repo_root: Union[str, Path] = Path("."),
+    history: Sequence["IterationRecord"] = (),
 ) -> ProposedEdit:
-    """Diagnose the failures, then propose exactly one edit to one allowed file."""
+    """Diagnose the failures, then propose exactly one edit to one allowed file.
+
+    ``history`` (prior accepted + rejected iteration records) is shown to the editor
+    so it does not repeat rejected ideas and can build on accepted ones.
+    """
     policy = policy if policy is not None else load_policy()
     complete = complete if complete is not None else _default_complete
 
-    diagnosis = complete(render_diagnose(feedback))
+    diagnosis = complete(render_diagnose(feedback, history))
     allowed_files = _read_allowed_files(policy, Path(repo_root))
     raw = complete(render_propose(diagnosis, allowed_files))
     return parse_proposal(raw)
