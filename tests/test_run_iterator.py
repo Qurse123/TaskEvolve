@@ -195,6 +195,25 @@ def test_search_cost_budget_stops_loop_early(tmp_path: Path) -> None:
     assert sum(r.search_cost_usd for r in results) == pytest.approx(0.04)
 
 
+def test_history_accumulates_and_reaches_editor(tmp_path: Path) -> None:
+    # Both iterations reject; iter 2's editor must see iter 1's change in its diagnosis.
+    prompts: list = []
+
+    def complete(prompt: str) -> str:
+        prompts.append(prompt)
+        return _proposal_json() if "JSON object" in prompt else "diagnosis"
+
+    eval_fn, _ = _eval_seq([0.09, 0.09])  # > best 0.083 -> reject each iteration
+
+    _run_iterator(tmp_path, complete=complete, eval_fn=eval_fn, max_iterations=2)
+
+    diagnose_prompts = [p for p in prompts if "JSON object" not in p]
+    assert len(diagnose_prompts) == 2
+    # Iteration 1 had no prior history; iteration 2 is told what iteration 1 tried.
+    assert "Tighten guidance." not in diagnose_prompts[0]
+    assert "Tighten guidance." in diagnose_prompts[1]
+
+
 def test_main_rejects_nonpositive_iterations(tmp_path: Path) -> None:
     from scripts.run_iterator import main
 

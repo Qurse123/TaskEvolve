@@ -311,3 +311,85 @@ def test_reject_does_not_invoke_commit_hook(tmp_path: Path) -> None:
 
     # Assert
     assert committed == []
+
+
+def _recording_complete(proposal_json: str, prompts: list):
+    """Editor stub that records every prompt it is shown."""
+    calls = {"n": 0}
+
+    def complete(prompt: str) -> str:
+        prompts.append(prompt)
+        calls["n"] += 1
+        return "diagnosis text" if calls["n"] == 1 else proposal_json
+
+    return complete
+
+
+def test_history_is_shown_to_the_editor(tmp_path: Path) -> None:
+    from iterator_agent.iteration_log import IterationRecord
+
+    prompts: list = []
+    prior = IterationRecord(
+        iteration_id="iter_0000", timestamp="t", harness_version="v0.1",
+        changed_surface="harness", changed_file="target_agent/harness.py",
+        change_summary="PRIOR_REJECTED_IDEA", reason_for_change="x",
+        proxy_seeds=(1, 2), proxy_task_success_before_mean=0.5,
+        proxy_task_success_before_std=0.0, proxy_task_success_after_mean=0.4,
+        proxy_task_success_after_std=0.0, cost_per_successful_task_before=0.08,
+        cost_per_successful_task_after=0.09, accepted_or_rejected="rejected",
+        reason_accepted_or_rejected="hurt success",
+    )
+    eval_fn, _ = _eval_counter(
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.069),
+    )
+
+    _run(
+        tmp_path,
+        complete=_recording_complete(_proposal_json(), prompts),
+        eval_fn=eval_fn,
+        history=[prior],
+    )
+
+    # The diagnose prompt (first editor call) carried the prior rejected change.
+    assert "PRIOR_REJECTED_IDEA" in prompts[0]
+
+
+def test_change_diff_written_for_accepted_iteration(tmp_path: Path) -> None:
+    eval_fn, _ = _eval_counter(
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.069),
+    )
+
+    _run(tmp_path, complete=_fake_complete(_proposal_json()), eval_fn=eval_fn)
+
+    diff = (tmp_path / "iterations" / "iter_0001" / "change.diff").read_text()
+    assert "IMPROVED PROMPT" in diff  # the new content
+    assert "ORIGINAL PROMPT" in diff  # and the prior content it replaced
+
+
+def test_change_diff_written_even_when_rejected(tmp_path: Path) -> None:
+    # A rejected edit is reverted from the tree, but its diff must still be captured.
+    eval_fn, _ = _eval_counter(
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.090),
+    )
+
+    _run(tmp_path, complete=_fake_complete(_proposal_json()), eval_fn=eval_fn)
+
+    diff = (tmp_path / "iterations" / "iter_0001" / "change.diff").read_text()
+    assert "IMPROVED PROMPT" in diff
+    # ...while the working tree was rolled back.
+    assert (tmp_path / ALLOWED_TARGET).read_text() == ORIGINAL_CONTENT
+
+
+def test_record_captures_editor_and_agent_models(tmp_path: Path) -> None:
+    eval_fn, _ = _eval_counter(
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.069),
+    )
+
+    result = _run(tmp_path, complete=_fake_complete(_proposal_json()), eval_fn=eval_fn)
+    record = json.loads(result.record_path.read_text(encoding="utf-8"))
+
+    assert record["editor_model"] == (config.ITERATOR_MODEL or "")
+    assert record["agent_model"] == (config.AGENT_MODEL or "")

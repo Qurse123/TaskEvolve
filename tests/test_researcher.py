@@ -111,6 +111,64 @@ def test_render_diagnose_includes_cost_table_and_digest():
     assert "get_order_details" in text
 
 
+def test_render_diagnose_includes_prior_change_history():
+    from iterator_agent.iteration_log import IterationRecord
+
+    prior = IterationRecord(
+        iteration_id="iter_0001",
+        timestamp="2026-01-01T00:00:00+00:00",
+        harness_version="v0.2",
+        changed_surface="harness",
+        changed_file="target_agent/harness.py",
+        change_summary="sliding window over last 4 turns",
+        reason_for_change="cut history tokens",
+        proxy_seeds=(1, 2),
+        proxy_task_success_before_mean=0.79,
+        proxy_task_success_before_std=0.0,
+        proxy_task_success_after_mean=0.67,
+        proxy_task_success_after_std=0.0,
+        cost_per_successful_task_before=0.058,
+        cost_per_successful_task_after=0.075,
+        accepted_or_rejected="rejected",
+        reason_accepted_or_rejected="hurt success",
+    )
+
+    text = render_diagnose(FEEDBACK, [prior])
+
+    # The editor is told what was already tried and that it was rejected.
+    assert "sliding window over last 4 turns" in text
+    assert "target_agent/harness.py" in text
+    assert "REJECTED" in text
+
+
+def test_run_editor_threads_history_into_diagnose(tmp_path):
+    from iterator_agent.iteration_log import IterationRecord
+
+    target = tmp_path / "target_agent" / "prompts" / "system_prompt.j2"
+    target.parent.mkdir(parents=True)
+    target.write_text("OLD PROMPT", encoding="utf-8")
+    policy = EditPolicy(
+        allowed_paths=frozenset({"target_agent/prompts/system_prompt.j2"}),
+        forbidden_prefixes=(),
+    )
+    prior = IterationRecord(
+        iteration_id="iter_0001", timestamp="t", harness_version="v0.2",
+        changed_surface="harness", changed_file="target_agent/harness.py",
+        change_summary="UNIQUE_PRIOR_IDEA", reason_for_change="x",
+        proxy_seeds=(1, 2), proxy_task_success_before_mean=0.5,
+        proxy_task_success_before_std=0.0, proxy_task_success_after_mean=0.4,
+        proxy_task_success_after_std=0.0, cost_per_successful_task_before=0.08,
+        cost_per_successful_task_after=0.09, accepted_or_rejected="rejected",
+        reason_accepted_or_rejected="hurt success",
+    )
+    fake = _FakeLLM(["DIAGNOSIS", _VALID_JSON])
+
+    run_editor(FEEDBACK, policy=policy, complete=fake, repo_root=tmp_path, history=[prior])
+
+    # The diagnose prompt (first call) carried the prior change.
+    assert "UNIQUE_PRIOR_IDEA" in fake.prompts[0]
+
+
 def test_render_propose_includes_diagnosis_and_allowed_file():
     allowed_files = [("target_agent/harness.py", "OLD HARNESS CODE")]
 
