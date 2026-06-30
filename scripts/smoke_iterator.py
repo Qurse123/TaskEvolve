@@ -72,7 +72,7 @@ ALLOWED_TARGET = "target_agent/prompts/system_prompt.j2"
 FORBIDDEN_TARGET = "benchmark/splits/proxy.json"
 
 # Number of _check() assertions in run_smoke_iterator — keeps the summary line honest.
-_TOTAL_CHECKS = 12
+_TOTAL_CHECKS = 15
 
 
 def _proposal_json(target: str) -> str:
@@ -181,6 +181,12 @@ def run_smoke_iterator() -> int:
         target_path = repo_root / ALLOWED_TARGET
 
         committed: List[str] = []
+        editor_prompts: List[str] = []
+        base_complete = _make_complete(ALLOWED_TARGET)
+
+        def editor_complete(prompt: str) -> str:
+            editor_prompts.append(prompt)
+            return base_complete(prompt)
 
         # --- Scenario A+B: drive the real loop for two iterations (accept, then reject) ---
         logger.info("Scenario A/B: run_iterator x2 (accept -> hill-climb -> reject)")
@@ -190,7 +196,7 @@ def run_smoke_iterator() -> int:
             repo_root=repo_root,
             initial_best=INITIAL_BEST,
             initial_version="v0.1",
-            complete=_make_complete(ALLOWED_TARGET),
+            complete=editor_complete,
             eval_seed=_make_eval_seed(),
             commit=lambda r: committed.append(r.iteration_id),
             iterations_root=iterations_root,
@@ -234,6 +240,27 @@ def run_smoke_iterator() -> int:
         failures += not _check(
             "edited file holds the accepted content (kept on accept; iter 2's revert is a no-op since it re-proposed the same edit)",
             target_path.read_text(encoding="utf-8") == accept.proposed_edit.new_content,
+        )
+        # Editor memory: iteration 2's diagnosis must cite iteration 1's accepted change.
+        diagnose_prompts = [p for p in editor_prompts if "JSON object" not in p]
+        failures += not _check(
+            "editor memory: iteration 2 diagnosis cites iteration 1's accepted change",
+            len(diagnose_prompts) >= 2
+            and accept.proposed_edit.change_summary in diagnose_prompts[1]
+            and accept.proposed_edit.change_summary not in diagnose_prompts[0],
+        )
+        # Change tracking: the exact edit diff is captured for the accepted iteration.
+        accept_diff = iterations_root / accept.iteration_id / "change.diff"
+        failures += not _check(
+            "change.diff captured the accepted edit",
+            accept_diff.exists()
+            and "concise retail support agent" in accept_diff.read_text(encoding="utf-8"),
+        )
+        # Model provenance: the iteration record names the editor + agent models.
+        accept_record = json.loads(accept.record_path.read_text(encoding="utf-8"))
+        failures += not _check(
+            "iteration record captures editor_model + agent_model",
+            "editor_model" in accept_record and "agent_model" in accept_record,
         )
 
         # --- Scenario C: forbidden target is rejected before any eval ---

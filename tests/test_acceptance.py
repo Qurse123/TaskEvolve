@@ -45,6 +45,35 @@ def test_load_guardrails_reads_real_yaml():
     assert g.task_success_floor_frac_of_best == 0.95
     assert g.max_cost_per_successful_task_usd is None
     assert g.max_invalid_action_rate is None
+    assert g.accept_margin_sigma == 1.0
+
+
+def test_margin_rejects_improvement_within_one_sigma_of_noise():
+    # best mean 0.09, std 0.01 -> with a 1σ margin the threshold is 0.08.
+    guardrails = Guardrails(
+        task_success_floor_frac_of_best=0.95,
+        max_cost_per_successful_task_usd=None,
+        max_invalid_action_rate=None,
+        accept_margin_sigma=1.0,
+    )
+    # 0.085 beats the mean but sits inside the noise band -> rejected.
+    within_noise = RunMetrics(pass_rate=0.6, cost_per_successful_task=0.085)
+    assert check_run(within_noise, BEST, guardrails).passed is False
+
+    # 0.079 clears mean - 1σ -> accepted.
+    beyond_noise = RunMetrics(pass_rate=0.6, cost_per_successful_task=0.079)
+    assert check_run(beyond_noise, BEST, guardrails).passed is True
+
+
+def test_zero_margin_keeps_legacy_below_mean_rule():
+    # Default margin 0.0 accepts anything strictly below the mean (legacy behavior).
+    legacy = Guardrails(
+        task_success_floor_frac_of_best=0.95,
+        max_cost_per_successful_task_usd=None,
+        max_invalid_action_rate=None,
+    )
+    run = RunMetrics(pass_rate=0.6, cost_per_successful_task=0.085)  # < 0.09 mean
+    assert check_run(run, BEST, legacy).passed is True
 
 
 def test_run_that_lowers_cost_and_holds_success_passes():
