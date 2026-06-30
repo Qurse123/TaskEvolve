@@ -77,6 +77,7 @@ def run_iterator(
             break
 
         seed_a = seed_start + SEEDS_PER_ITERATION * index
+        history = [r.record for r in results]
         result = run_iteration(
             iteration_id=f"iter_{index + 1:04d}",
             seeds=(seed_a, seed_a + 1),
@@ -86,6 +87,7 @@ def run_iterator(
             guardrails=guardrails,
             best=best,
             current_version=current_version,
+            history=history,
             complete=complete,
             eval_seed=eval_seed,
             commit=commit,
@@ -97,8 +99,11 @@ def run_iterator(
         total_search_cost += result.search_cost_usd
 
         if result.accepted:
+            noise_std = best.cost_per_successful_task_std or 0.0
             current_version = result.harness_version
-            best = _distribution_from_result(result, split, current_version)
+            best = _distribution_from_result(
+                result, split, current_version, noise_std=noise_std
+            )
 
         logger.info(
             "%s: %s -> %s | search $%.4f (total $%.4f)",
@@ -114,9 +119,14 @@ def run_iterator(
 
 
 def _distribution_from_result(
-    result: IterationResult, split: str, version: str
+    result: IterationResult, split: str, version: str, *, noise_std: float
 ) -> Distribution:
-    """The accepted candidate's proxy double-run becomes the next current-best."""
+    """The accepted candidate's proxy double-run becomes the next current-best.
+
+    ``noise_std`` carries forward the prior best's cost std as a stable estimate of
+    the benchmark's seed noise, so the acceptance margin (μ - kσ) stays meaningful
+    across the hill-climb rather than collapsing to a 2-seed std of ~0.
+    """
     record = result.record
     return Distribution(
         split=split,
@@ -125,7 +135,7 @@ def _distribution_from_result(
         pass_rate_mean=record.proxy_task_success_after_mean,
         pass_rate_std=record.proxy_task_success_after_std,
         cost_per_successful_task_mean=record.cost_per_successful_task_after,
-        cost_per_successful_task_std=0.0,
+        cost_per_successful_task_std=noise_std,
         run_ids=(),
     )
 

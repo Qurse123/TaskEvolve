@@ -22,6 +22,14 @@ Turn-by-turn transcripts of the costliest tasks:
 {{ digest }}
 {% endfor %}
 
+{% if history %}
+Changes already attempted this run — do NOT re-propose a REJECTED idea; build on
+what was ACCEPTED:
+{% for h in history %}
+- [{{ h.accepted_or_rejected | upper }}] {{ h.changed_file }} — {{ h.change_summary }} ({{ h.reason_accepted_or_rejected }})
+{% endfor %}
+{% endif %}
+
 The objective is to REDUCE cost per successful task WITHOUT lowering task success.
 Cost is driven by turns, tool calls, and model choice. Using the cost table and the
 transcripts above, analyze in 3-5 concise bullet points where cost is being wasted
