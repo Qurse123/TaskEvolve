@@ -59,6 +59,10 @@ class IterationRecord:
     reason_accepted_or_rejected: str
     iterator_search_cost_usd: Optional[float] = None
     notes: str = ""
+    # Provenance: which models were in play this iteration (editor = the LLM that
+    # proposed the edit; agent = the task model the proxy eval ran). Default-safe.
+    editor_model: str = ""
+    agent_model: str = ""
 
 
 def iteration_dir(

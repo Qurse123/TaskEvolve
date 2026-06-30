@@ -11,13 +11,14 @@ optimization (CLAUDE.md "Hard Constraints" #2).
 
 from __future__ import annotations
 
+import csv
 import json
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
 
-from results.logger import DEFAULT_LOGS_ROOT, _safe
+from results.logger import DEFAULT_LOGS_ROOT, DEFAULT_RESULTS_CSV, _safe
 
 # How many of the costliest tasks get a transcript digest in the feedback, and how
 # far each message is truncated — both bound the editor's (iterator search) cost.
@@ -81,6 +82,40 @@ def find_latest_run_dir(
     if not candidates:
         raise ValueError(f"no run folder for split={split!r} under {root}")
     return max(candidates, key=lambda d: d.name)
+
+
+def find_latest_run_dir_for_version(
+    split: str,
+    harness_version: str,
+    *,
+    logs_root: Union[str, Path] = DEFAULT_LOGS_ROOT,
+    csv_path: Union[str, Path] = DEFAULT_RESULTS_CSV,
+) -> Path:
+    """Return the newest run folder for ``(split, harness_version)``.
+
+    The editor must diagnose the *current-best* harness, not whichever run wrote a
+    folder last (which, mid-loop, is the previous rejected candidate). ``results.csv``
+    tags every run with its ``harness_version`` and ``run_id`` (== the run-dir name),
+    so we pick the lexically greatest matching ``run_id`` (names embed a sortable
+    ``YYYYMMDD_HHMMSS`` stamp).
+
+    Raises:
+        ValueError: If the CSV is missing or no row matches ``(split, version)``.
+    """
+    csv_path = Path(csv_path)
+    if not csv_path.exists():
+        raise ValueError(f"results CSV not found: {csv_path}")
+    run_ids = [
+        row.get("run_id") or ""
+        for row in csv.DictReader(csv_path.open(newline="", encoding="utf-8"))
+        if row.get("split") == split and row.get("harness_version") == harness_version
+    ]
+    run_ids = [rid for rid in run_ids if rid]
+    if not run_ids:
+        raise ValueError(
+            f"no run in {csv_path} for split={split!r} harness_version={harness_version!r}"
+        )
+    return Path(logs_root) / max(run_ids)
 
 
 def _load_task(path: Path) -> TaskRecord:
@@ -191,7 +226,26 @@ def summarize_run(run_dir: Union[str, Path]) -> FeedbackSummary:
 
 
 def build_feedback(
-    split: str = "proxy", *, logs_root: Union[str, Path] = DEFAULT_LOGS_ROOT
+    split: str = "proxy",
+    *,
+    harness_version: Optional[str] = None,
+    logs_root: Union[str, Path] = DEFAULT_LOGS_ROOT,
+    csv_path: Union[str, Path] = DEFAULT_RESULTS_CSV,
 ) -> FeedbackSummary:
-    """Summarize the most recent run for ``split`` (defaults to proxy)."""
-    return summarize_run(find_latest_run_dir(split, logs_root=logs_root))
+    """Summarize the run the editor should diagnose (defaults to proxy).
+
+    When ``harness_version`` is given, summarize the newest run for *that* version —
+    the current-best harness — so the editor never reasons over a reverted candidate.
+    Falls back to the newest run of any version when the version has no run yet (e.g.
+    the first iteration off the Arm A baseline that produced no version-tagged row).
+    """
+    if harness_version is not None:
+        try:
+            run_dir = find_latest_run_dir_for_version(
+                split, harness_version, logs_root=logs_root, csv_path=csv_path
+            )
+        except ValueError:
+            run_dir = find_latest_run_dir(split, logs_root=logs_root)
+    else:
+        run_dir = find_latest_run_dir(split, logs_root=logs_root)
+    return summarize_run(run_dir)

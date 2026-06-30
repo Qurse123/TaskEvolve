@@ -37,6 +37,11 @@ class Guardrails:
     task_success_floor_frac_of_best: float
     max_cost_per_successful_task_usd: Optional[float]
     max_invalid_action_rate: Optional[float]
+    # Noise floor: a run must beat the current-best cost mean by at least this many
+    # standard deviations of the best distribution (experiment.md §20). 0.0 = strict
+    # below-mean (legacy). >0 absorbs a single lucky 2-seed accept. Default 0.0 so
+    # hand-built Guardrails (tests) keep the legacy rule.
+    accept_margin_sigma: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -75,6 +80,7 @@ def load_guardrails(path: Union[str, Path] = DEFAULT_POLICY_PATH) -> Guardrails:
             block.get("max_cost_per_successful_task_usd")
         ),
         max_invalid_action_rate=_opt_float(block.get("max_invalid_action_rate")),
+        accept_margin_sigma=float(block.get("accept_margin_sigma") or 0.0),
     )
 
 
@@ -87,11 +93,18 @@ def check_run(run: RunMetrics, best: Distribution, guardrails: Guardrails) -> Ru
         return RunCheck(
             False, "no cost improvement: run reported no cost per successful task"
         )
-    if not (run.cost_per_successful_task < best.cost_per_successful_task_mean):
+    # Improvement must clear the current-best mean by a noise margin (μ - kσ), so a
+    # single lucky 2-seed draw within the benchmark's seed noise cannot be accepted.
+    sigma = best.cost_per_successful_task_std or 0.0
+    margin = guardrails.accept_margin_sigma * sigma
+    threshold = best.cost_per_successful_task_mean - margin
+    if not (run.cost_per_successful_task < threshold):
         return RunCheck(
             False,
-            f"no cost improvement: {run.cost_per_successful_task:.6f} "
-            f">= best {best.cost_per_successful_task_mean:.6f}",
+            f"no cost improvement beyond noise: {run.cost_per_successful_task:.6f} "
+            f">= threshold {threshold:.6f} "
+            f"(best mean {best.cost_per_successful_task_mean:.6f} "
+            f"- {guardrails.accept_margin_sigma:g}σ·{sigma:.6f})",
         )
 
     # 2. Guardrail: task-success floor (a fraction of the current-best mean).
