@@ -18,8 +18,10 @@ from iterator_agent.feedback import (
     FeedbackSummary,
     build_feedback,
     find_latest_run_dir,
+    find_latest_run_dir_for_version,
     summarize_run,
 )
+from settings import config
 from results.logger import finalize_run, log_task, start_run
 
 
@@ -188,5 +190,46 @@ def test_load_run_tasks_ignores_messages_files(tmp_path):
     )
 
     summary = summarize_run(run_dir)
+
+    assert summary.num_tasks == 1
+
+
+def test_find_latest_run_dir_for_version_picks_by_version(tmp_path, monkeypatch):
+    # An older v0.1 run and a newer v0.2 run; asking for v0.1 must skip the newer one.
+    monkeypatch.setattr(config, "HARNESS_VERSION", "v0.1")
+    old = _make_run(tmp_path, "proxy", _at(1), [_result("t", passed=True, reward=1.0, cost=0.1)])
+    monkeypatch.setattr(config, "HARNESS_VERSION", "v0.2")
+    _make_run(tmp_path, "proxy", _at(2), [_result("t", passed=True, reward=1.0, cost=0.1)])
+
+    run_dir = find_latest_run_dir_for_version(
+        "proxy", "v0.1", logs_root=tmp_path, csv_path=tmp_path / "results.csv"
+    )
+
+    assert run_dir.name == old
+
+
+def test_build_feedback_diagnoses_current_best_not_latest(tmp_path, monkeypatch):
+    # The current-best is v0.1; a later v0.2 candidate run must NOT be the feedback.
+    monkeypatch.setattr(config, "HARNESS_VERSION", "v0.1")
+    best_run = _make_run(tmp_path, "proxy", _at(1), [_result("best_task", passed=True, reward=1.0, cost=0.1)])
+    monkeypatch.setattr(config, "HARNESS_VERSION", "v0.2")
+    _make_run(tmp_path, "proxy", _at(2), [_result("candidate_task", passed=False, reward=0.0, cost=0.2)])
+
+    summary = build_feedback(
+        "proxy", harness_version="v0.1", logs_root=tmp_path, csv_path=tmp_path / "results.csv"
+    )
+
+    assert summary.run_id == best_run
+    assert {t.task_id for t in summary.tasks} == {"best_task"}
+
+
+def test_build_feedback_falls_back_when_version_has_no_run(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "HARNESS_VERSION", "v0.1")
+    _make_run(tmp_path, "proxy", _at(1), [_result("t", passed=True, reward=1.0, cost=0.1)])
+
+    # No run exists for v9.9 -> fall back to the latest proxy run rather than crash.
+    summary = build_feedback(
+        "proxy", harness_version="v9.9", logs_root=tmp_path, csv_path=tmp_path / "results.csv"
+    )
 
     assert summary.num_tasks == 1

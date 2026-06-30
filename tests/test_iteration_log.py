@@ -68,6 +68,29 @@ def test_write_record_round_trips_all_fields(tmp_path: Path) -> None:
     assert loaded["accepted_or_rejected"] == "accepted"
 
 
+def test_write_record_round_trips_model_provenance(tmp_path: Path) -> None:
+    # Arrange: provenance of which models were in play this iteration.
+    record = _record(editor_model="gpt-4.1", agent_model="gpt-4.1-mini")
+
+    # Act
+    loaded = json.loads(
+        write_record(record, logs_root=tmp_path).read_text(encoding="utf-8")
+    )
+
+    # Assert
+    assert loaded["editor_model"] == "gpt-4.1"
+    assert loaded["agent_model"] == "gpt-4.1-mini"
+
+
+def test_model_provenance_defaults_to_empty(tmp_path: Path) -> None:
+    loaded = json.loads(
+        write_record(_record(), logs_root=tmp_path).read_text(encoding="utf-8")
+    )
+
+    assert loaded["editor_model"] == ""
+    assert loaded["agent_model"] == ""
+
+
 def test_write_record_keeps_optional_cost_none(tmp_path: Path) -> None:
     # Arrange
     record = _record(cost_per_successful_task_after=None)
