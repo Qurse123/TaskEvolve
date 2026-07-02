@@ -44,6 +44,8 @@ def _best(cost: float = 0.083, pass_rate: float = 0.583) -> Distribution:
         cost_per_successful_task_mean=cost,
         cost_per_successful_task_std=0.016,
         run_ids=("proxy_a", "proxy_b"),
+        cost_per_task_mean=cost,
+        cost_per_task_std=0.016,
     )
 
 
@@ -124,8 +126,8 @@ def _run(tmp_path: Path, *, complete, eval_fn, **overrides):
 def test_accepts_when_both_runs_improve(tmp_path: Path) -> None:
     # Arrange: both proxy runs beat the best cost, success holds.
     eval_fn, calls = _eval_counter(
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071),
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.069),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071, cost_per_task=0.071),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.069, cost_per_task=0.069),
     )
 
     # Act
@@ -142,8 +144,8 @@ def test_accepts_when_both_runs_improve(tmp_path: Path) -> None:
 def test_accept_writes_iteration_record(tmp_path: Path) -> None:
     # Arrange
     eval_fn, _ = _eval_counter(
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071),
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.069),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071, cost_per_task=0.071),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.069, cost_per_task=0.069),
     )
 
     # Act
@@ -162,8 +164,8 @@ def test_accept_writes_iteration_record(tmp_path: Path) -> None:
 def test_rejects_and_reverts_when_first_run_no_improvement(tmp_path: Path) -> None:
     # Arrange: first run costs more than best -> reject without running seed B.
     eval_fn, calls = _eval_counter(
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.090),
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.069),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.090, cost_per_task=0.090),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.069, cost_per_task=0.069),
     )
 
     # Act
@@ -181,8 +183,8 @@ def test_rejects_and_reverts_when_first_run_no_improvement(tmp_path: Path) -> No
 def test_rejects_when_second_run_fails(tmp_path: Path) -> None:
     # Arrange: A improves, B does not.
     eval_fn, calls = _eval_counter(
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071),
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.090),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071, cost_per_task=0.071),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.090, cost_per_task=0.090),
     )
 
     # Act
@@ -197,7 +199,7 @@ def test_rejects_when_second_run_fails(tmp_path: Path) -> None:
 def test_rejects_forbidden_target_without_running_eval(tmp_path: Path) -> None:
     # Arrange: editor proposes a forbidden file.
     eval_fn, calls = _eval_counter(
-        RunMetrics(pass_rate=0.9, cost_per_successful_task=0.01),
+        RunMetrics(pass_rate=0.9, cost_per_successful_task=0.01, cost_per_task=0.01),
     )
     forbidden = _proposal_json(target="benchmark/adapter.py")
 
@@ -213,7 +215,7 @@ def test_rejects_forbidden_target_without_running_eval(tmp_path: Path) -> None:
 
 def test_malformed_harness_version_fails_before_edit_or_eval(tmp_path: Path) -> None:
     eval_fn, calls = _eval_counter(
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071, cost_per_task=0.071),
     )
 
     with pytest.raises(ValueError, match="vMAJOR.MINOR"):
@@ -231,8 +233,8 @@ def test_malformed_harness_version_fails_before_edit_or_eval(tmp_path: Path) -> 
 def test_accept_invokes_commit_hook(tmp_path: Path) -> None:
     # Arrange
     eval_fn, _ = _eval_counter(
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071),
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.069),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071, cost_per_task=0.071),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.069, cost_per_task=0.069),
     )
     committed = []
 
@@ -266,8 +268,8 @@ class _CostingComplete:
 def test_records_editor_search_cost(tmp_path: Path) -> None:
     # Arrange
     eval_fn, _ = _eval_counter(
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071),
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.069),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071, cost_per_task=0.071),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.069, cost_per_task=0.069),
     )
     complete = _CostingComplete(_proposal_json(), cost_per_call=0.015)
 
@@ -283,8 +285,8 @@ def test_records_editor_search_cost(tmp_path: Path) -> None:
 def test_search_cost_zero_when_completion_untracked(tmp_path: Path) -> None:
     # Arrange: a plain function complete (no total_cost_usd attribute).
     eval_fn, _ = _eval_counter(
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071),
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.069),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071, cost_per_task=0.071),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.069, cost_per_task=0.069),
     )
 
     # Act
@@ -297,7 +299,7 @@ def test_search_cost_zero_when_completion_untracked(tmp_path: Path) -> None:
 def test_reject_does_not_invoke_commit_hook(tmp_path: Path) -> None:
     # Arrange
     eval_fn, _ = _eval_counter(
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.090),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.090, cost_per_task=0.090),
     )
     committed = []
 
@@ -340,8 +342,8 @@ def test_history_is_shown_to_the_editor(tmp_path: Path) -> None:
         reason_accepted_or_rejected="hurt success",
     )
     eval_fn, _ = _eval_counter(
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071),
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.069),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071, cost_per_task=0.071),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.069, cost_per_task=0.069),
     )
 
     _run(
@@ -357,8 +359,8 @@ def test_history_is_shown_to_the_editor(tmp_path: Path) -> None:
 
 def test_change_diff_written_for_accepted_iteration(tmp_path: Path) -> None:
     eval_fn, _ = _eval_counter(
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071),
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.069),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071, cost_per_task=0.071),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.069, cost_per_task=0.069),
     )
 
     _run(tmp_path, complete=_fake_complete(_proposal_json()), eval_fn=eval_fn)
@@ -371,7 +373,7 @@ def test_change_diff_written_for_accepted_iteration(tmp_path: Path) -> None:
 def test_change_diff_written_even_when_rejected(tmp_path: Path) -> None:
     # A rejected edit is reverted from the tree, but its diff must still be captured.
     eval_fn, _ = _eval_counter(
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.090),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.090, cost_per_task=0.090),
     )
 
     _run(tmp_path, complete=_fake_complete(_proposal_json()), eval_fn=eval_fn)
@@ -384,8 +386,8 @@ def test_change_diff_written_even_when_rejected(tmp_path: Path) -> None:
 
 def test_record_captures_editor_and_agent_models(tmp_path: Path) -> None:
     eval_fn, _ = _eval_counter(
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071),
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.069),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071, cost_per_task=0.071),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.069, cost_per_task=0.069),
     )
 
     result = _run(tmp_path, complete=_fake_complete(_proposal_json()), eval_fn=eval_fn)

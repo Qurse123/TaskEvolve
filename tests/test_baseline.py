@@ -82,6 +82,23 @@ def test_filters_by_split_and_harness_version(tmp_path):
     assert dist.run_ids == ("proxy_1", "proxy_2")
 
 
+def test_load_distribution_computes_cost_per_task(tmp_path):
+    # The optimization objective: total_cost_usd / num_tasks per run, mean ± std.
+    csv_path = tmp_path / "results.csv"
+    rows = [
+        _row("proxy_1", split="proxy", harness_version="v0.1", pass_rate=0.5, cps=0.08),
+        _row("proxy_2", split="proxy", harness_version="v0.1", pass_rate=0.6, cps=0.09),
+    ]
+    rows[0]["total_cost_usd"] = 0.60  # 0.60 / 12 = 0.05 per task
+    rows[1]["total_cost_usd"] = 0.72  # 0.72 / 12 = 0.06 per task
+    _write_csv(csv_path, rows)
+
+    dist = load_distribution("proxy", "v0.1", csv_path=csv_path)
+
+    assert dist.cost_per_task_mean == pytest.approx(0.055)
+    assert dist.cost_per_task_std == pytest.approx(0.0070710678, rel=1e-6)
+
+
 def test_single_row_has_zero_std(tmp_path):
     csv_path = tmp_path / "results.csv"
     _write_csv(
