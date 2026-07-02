@@ -804,7 +804,7 @@ For performance-first arms, a change may be accepted if:
 
 For cost-aware arms, a change may be accepted if:
 
-1. It reduces cost per successful task.
+1. It reduces the **mean cost per task** below the current-best mean by at least the declared noise margin (`accept_margin_sigma` × the current-best std). *(M2 amendment: the optimization objective is mean cost per task — fixed denominator, ~5% seed CV — rather than cost per successful task, whose pass-count denominator injects ~4× more seed noise and hides real token savings at n=2. Cost per successful task remains the reported headline metric; task success is protected by rule 2.)*
 2. It maintains task success above the required threshold.
 3. It maintains policy compliance above the required threshold.
 4. It does not increase hidden-risk indicators such as invalid actions, tool misuse, or task-category collapse.

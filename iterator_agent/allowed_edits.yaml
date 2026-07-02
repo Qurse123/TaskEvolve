@@ -39,6 +39,7 @@ guardrails:
   max_cost_per_successful_task_usd: null
   max_invalid_action_rate: null
   # Noise floor (experiment.md §20): a candidate run must beat the current-best
-  # cost-per-successful-task mean by at least this many standard deviations of the
-  # best distribution. Absorbs a single lucky 2-seed accept. 1.0 = μ - 1σ.
+  # MEAN COST PER TASK by at least this many standard deviations of the best
+  # distribution. The per-task objective has a fixed denominator (~5% seed CV),
+  # so real token savings clear this margin while lucky 2-seed draws do not.
   accept_margin_sigma: 1.0
