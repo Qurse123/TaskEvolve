@@ -45,6 +45,9 @@ class RepeatMetrics:
     seed: int
     pass_rate: float
     cost_per_successful_task: Optional[float]
+    # Iterator optimization objective: total agent cost / task count (fixed
+    # denominator, so no pass-count noise). None when no task reported a cost.
+    cost_per_task: Optional[float] = None
 
 
 def run_repeats(
@@ -167,11 +170,12 @@ def _run_one_repeat(
 
     pass_rate = sum(1 for r in results if r.passed) / len(results) if results else 0.0
     cost_per_success = _cost_per_successful_task(results)
+    cost_per_task = _cost_per_task(results)
     logger.info(
-        "  run %s (seed=%d): pass_rate=%.3f cost_per_success=%s",
-        run.run_id, seed, pass_rate, _fmt(cost_per_success),
+        "  run %s (seed=%d): pass_rate=%.3f cost_per_success=%s cost_per_task=%s",
+        run.run_id, seed, pass_rate, _fmt(cost_per_success), _fmt(cost_per_task),
     )
-    return RepeatMetrics(run.run_id, seed, pass_rate, cost_per_success)
+    return RepeatMetrics(run.run_id, seed, pass_rate, cost_per_success, cost_per_task)
 
 
 def _cost_per_successful_task(results: Sequence[EvalResult]) -> Optional[float]:
@@ -181,6 +185,14 @@ def _cost_per_successful_task(results: Sequence[EvalResult]) -> Optional[float]:
     if not costs or not num_passed:
         return None
     return sum(costs) / num_passed
+
+
+def _cost_per_task(results: Sequence[EvalResult]) -> Optional[float]:
+    """Total agent cost divided by task count; None if no task reported a cost."""
+    costs = [r.agent_cost for r in results if r.agent_cost is not None]
+    if not costs or not results:
+        return None
+    return sum(costs) / len(results)
 
 
 def _log_distribution(split: str, metrics: Sequence[RepeatMetrics]) -> None:

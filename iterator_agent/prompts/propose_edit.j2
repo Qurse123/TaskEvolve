@@ -8,9 +8,13 @@ These are the only files you are allowed to change.
 {{ content }}
 
 {% endfor %}
-Propose exactly ONE change to ONE file that should reduce cost per successful task
-without lowering task success. Keep the change focused enough to attribute its
-effect.
+Propose exactly ONE change to ONE file that should reduce the MEAN COST PER TASK
+without lowering task success (success is a hard floor). Keep the change focused
+enough to attribute its effect.
+
+Model constraint: the only valid model names are "gpt-4.1" and "gpt-4.1-mini".
+If your change touches model routing, use gpt-4.1-mini as the cheap option —
+NEVER reference any other model (no gpt-3.5*, no gpt-4o*, nothing else).
 
 Respond with ONLY a JSON object (no prose, no markdown fences) of the form:
 {

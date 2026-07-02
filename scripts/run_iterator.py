@@ -99,7 +99,8 @@ def run_iterator(
         total_search_cost += result.search_cost_usd
 
         if result.accepted:
-            noise_std = best.cost_per_successful_task_std or 0.0
+            # Carry the objective's noise scale forward so the margin stays meaningful.
+            noise_std = best.cost_per_task_std or 0.0
             current_version = result.harness_version
             best = _distribution_from_result(
                 result, split, current_version, noise_std=noise_std
@@ -123,9 +124,9 @@ def _distribution_from_result(
 ) -> Distribution:
     """The accepted candidate's proxy double-run becomes the next current-best.
 
-    ``noise_std`` carries forward the prior best's cost std as a stable estimate of
-    the benchmark's seed noise, so the acceptance margin (μ - kσ) stays meaningful
-    across the hill-climb rather than collapsing to a 2-seed std of ~0.
+    ``noise_std`` carries forward the prior best's per-task cost std (the objective's
+    seed-noise scale), so the acceptance margin (μ - kσ) stays meaningful across the
+    hill-climb rather than collapsing to a 2-seed std of ~0.
     """
     record = result.record
     return Distribution(
@@ -135,8 +136,10 @@ def _distribution_from_result(
         pass_rate_mean=record.proxy_task_success_after_mean,
         pass_rate_std=record.proxy_task_success_after_std,
         cost_per_successful_task_mean=record.cost_per_successful_task_after,
-        cost_per_successful_task_std=noise_std,
+        cost_per_successful_task_std=0.0,
         run_ids=(),
+        cost_per_task_mean=record.cost_per_task_after,
+        cost_per_task_std=noise_std,
     )
 
 
