@@ -63,6 +63,11 @@ class IterationRecord:
     # proposed the edit; agent = the task model the proxy eval ran). Default-safe.
     editor_model: str = ""
     agent_model: str = ""
+    # Optimization objective (mean cost per task) before/after — the low-variance
+    # signal the acceptance rule scores; cost_per_successful_task above stays the
+    # reported headline.
+    cost_per_task_before: Optional[float] = None
+    cost_per_task_after: Optional[float] = None
 
 
 def iteration_dir(
