@@ -35,6 +35,7 @@ def _best() -> Distribution:
         pass_rate_mean=0.583, pass_rate_std=0.083,
         cost_per_successful_task_mean=0.083, cost_per_successful_task_std=0.016,
         run_ids=(),
+        cost_per_task_mean=0.083, cost_per_task_std=0.016,
     )
 
 
@@ -89,7 +90,10 @@ def _eval_seq(costs, pass_rate: float = 0.667):
 
     def eval_fn(seed: int) -> RunMetrics:
         seen.append(seed)
-        return RunMetrics(pass_rate=pass_rate, cost_per_successful_task=seq.pop(0))
+        cost = seq.pop(0)
+        return RunMetrics(
+            pass_rate=pass_rate, cost_per_successful_task=cost, cost_per_task=cost
+        )
 
     return eval_fn, seen
 

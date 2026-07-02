@@ -19,7 +19,8 @@ from iterator_agent.acceptance import (
 )
 from iterator_agent.baseline import Distribution
 
-# Current-best proxy distribution: mean pass_rate 0.6, mean cost/success 0.09.
+# Current-best proxy distribution: mean pass_rate 0.6; per-task cost (the
+# objective) mirrors cost/success at 0.09 so scenario numbers stay readable.
 BEST = Distribution(
     split="proxy",
     harness_version="v0.1",
@@ -29,6 +30,8 @@ BEST = Distribution(
     cost_per_successful_task_mean=0.09,
     cost_per_successful_task_std=0.01,
     run_ids=("proxy_a", "proxy_b"),
+    cost_per_task_mean=0.09,
+    cost_per_task_std=0.01,
 )
 
 # floor = 0.95 * 0.6 = 0.57; no cost/invalid ceilings.
@@ -57,11 +60,11 @@ def test_margin_rejects_improvement_within_one_sigma_of_noise():
         accept_margin_sigma=1.0,
     )
     # 0.085 beats the mean but sits inside the noise band -> rejected.
-    within_noise = RunMetrics(pass_rate=0.6, cost_per_successful_task=0.085)
+    within_noise = RunMetrics(pass_rate=0.6, cost_per_successful_task=0.085, cost_per_task=0.085)
     assert check_run(within_noise, BEST, guardrails).passed is False
 
     # 0.079 clears mean - 1σ -> accepted.
-    beyond_noise = RunMetrics(pass_rate=0.6, cost_per_successful_task=0.079)
+    beyond_noise = RunMetrics(pass_rate=0.6, cost_per_successful_task=0.079, cost_per_task=0.079)
     assert check_run(beyond_noise, BEST, guardrails).passed is True
 
 
@@ -72,12 +75,12 @@ def test_zero_margin_keeps_legacy_below_mean_rule():
         max_cost_per_successful_task_usd=None,
         max_invalid_action_rate=None,
     )
-    run = RunMetrics(pass_rate=0.6, cost_per_successful_task=0.085)  # < 0.09 mean
+    run = RunMetrics(pass_rate=0.6, cost_per_successful_task=0.085, cost_per_task=0.085)  # < 0.09 mean
     assert check_run(run, BEST, legacy).passed is True
 
 
 def test_run_that_lowers_cost_and_holds_success_passes():
-    run = RunMetrics(pass_rate=0.6, cost_per_successful_task=0.08)
+    run = RunMetrics(pass_rate=0.6, cost_per_successful_task=0.08, cost_per_task=0.08)
 
     check = check_run(run, BEST, GUARDRAILS)
 
@@ -85,7 +88,7 @@ def test_run_that_lowers_cost_and_holds_success_passes():
 
 
 def test_run_below_success_floor_fails():
-    run = RunMetrics(pass_rate=0.5, cost_per_successful_task=0.08)  # 0.5 < 0.57 floor
+    run = RunMetrics(pass_rate=0.5, cost_per_successful_task=0.08, cost_per_task=0.08)  # 0.5 < 0.57 floor
 
     check = check_run(run, BEST, GUARDRAILS)
 
@@ -94,7 +97,7 @@ def test_run_below_success_floor_fails():
 
 
 def test_run_without_cost_improvement_fails():
-    run = RunMetrics(pass_rate=0.6, cost_per_successful_task=0.10)  # >= 0.09 best
+    run = RunMetrics(pass_rate=0.6, cost_per_successful_task=0.10, cost_per_task=0.10)  # >= 0.09 best
 
     check = check_run(run, BEST, GUARDRAILS)
 
@@ -120,8 +123,8 @@ def test_cost_ceiling_guardrail_blocks_even_when_improved():
 
 def test_both_runs_passing_accepts():
     runs = [
-        RunMetrics(pass_rate=0.60, cost_per_successful_task=0.080),
-        RunMetrics(pass_rate=0.62, cost_per_successful_task=0.082),
+        RunMetrics(pass_rate=0.60, cost_per_successful_task=0.080, cost_per_task=0.080),
+        RunMetrics(pass_rate=0.62, cost_per_successful_task=0.082, cost_per_task=0.082),
     ]
 
     decision = evaluate_candidate(runs, BEST, GUARDRAILS)
@@ -131,8 +134,8 @@ def test_both_runs_passing_accepts():
 
 def test_one_failing_run_rejects():
     runs = [
-        RunMetrics(pass_rate=0.60, cost_per_successful_task=0.080),
-        RunMetrics(pass_rate=0.50, cost_per_successful_task=0.082),  # below floor
+        RunMetrics(pass_rate=0.60, cost_per_successful_task=0.080, cost_per_task=0.080),
+        RunMetrics(pass_rate=0.50, cost_per_successful_task=0.082, cost_per_task=0.082),  # below floor
     ]
 
     decision = evaluate_candidate(runs, BEST, GUARDRAILS)
@@ -141,7 +144,7 @@ def test_one_failing_run_rejects():
 
 
 def test_single_run_cannot_be_accepted():
-    runs = [RunMetrics(pass_rate=0.60, cost_per_successful_task=0.080)]
+    runs = [RunMetrics(pass_rate=0.60, cost_per_successful_task=0.080, cost_per_task=0.080)]
 
     decision = evaluate_candidate(runs, BEST, GUARDRAILS)
 
