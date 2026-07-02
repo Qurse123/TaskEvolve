@@ -4,7 +4,7 @@ more cheaply while keeping task success high.
 
 Most recent proxy evaluation ({{ s.run_id }}):
 - tasks: {{ s.num_tasks }}, passed: {{ s.num_passed }}, failed: {{ s.num_failed }}
-- total cost: {{ "$%.4f"|format(s.total_cost_usd) if s.total_cost_usd is not none else "n/a" }}, cost per successful task: {{ "$%.4f"|format(s.cost_per_successful_task) if s.cost_per_successful_task is not none else "n/a" }}
+- total cost: {{ "$%.4f"|format(s.total_cost_usd) if s.total_cost_usd is not none else "n/a" }}, mean cost per task: {{ "$%.4f"|format(s.total_cost_usd / s.num_tasks) if s.total_cost_usd is not none and s.num_tasks else "n/a" }}, cost per successful task: {{ "$%.4f"|format(s.cost_per_successful_task) if s.cost_per_successful_task is not none else "n/a" }}
 
 Per-task cost levers (all tasks — passing tasks waste cost too):
 {% for t in s.tasks %}
@@ -30,10 +30,14 @@ what was ACCEPTED:
 {% endfor %}
 {% endif %}
 
-The objective is to REDUCE cost per successful task WITHOUT lowering task success.
-Cost is driven by turns, tool calls, and model choice. Using the cost table and the
-transcripts above, analyze in 3-5 concise bullet points where cost is being wasted
-(redundant turns or tool calls, verbose context, an over-powered model on easy
-tasks, avoidable failures) and which harness lever could cut it — system prompt,
-policy summary, few-shot examples, conversation-history handling, tool filtering, or
-model routing. Do NOT write code yet; just diagnose.
+The objective is to REDUCE the MEAN COST PER TASK while keeping task success at or
+above its current level (success is a hard floor — a cheaper change that drops
+success will be rejected). Cost is driven by turns, tool calls, and model choice.
+The only models available to the task agent are gpt-4.1 and gpt-4.1-mini (a ~5x
+cheaper, near-capability sibling) — no other model exists in this environment.
+Using the cost table and the transcripts above, analyze in 3-5 concise bullet
+points where cost is being wasted (redundant turns or tool calls, verbose context,
+an over-powered model on easy turns, avoidable failures) and which harness lever
+could cut it — system prompt, policy summary, few-shot examples,
+conversation-history handling, tool filtering, or model routing. Do NOT write code
+yet; just diagnose.

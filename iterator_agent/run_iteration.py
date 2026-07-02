@@ -242,7 +242,7 @@ def _persist(
     commit: Optional[Callable[[IterationResult], None]],
 ) -> IterationResult:
     """Build the §22 record, write it + the changelog + the change diff, commit on accept."""
-    after_mean, after_std, after_cost = _after_stats(runs)
+    after_mean, after_std, after_cost, after_per_task = _after_stats(runs)
     record = IterationRecord(
         iteration_id=iteration_id,
         timestamp=datetime.now(timezone.utc).isoformat(),
@@ -263,6 +263,8 @@ def _persist(
         iterator_search_cost_usd=search_cost,
         editor_model=editor_model,
         agent_model=agent_model,
+        cost_per_task_before=best.cost_per_task_mean,
+        cost_per_task_after=after_per_task,
     )
     record_path = write_record(record, logs_root=iterations_root)
     changelog_path = append_changelog(record, experiments_dir=experiments_dir)
@@ -291,10 +293,12 @@ def _persist(
     return result
 
 
-def _after_stats(runs: Sequence[RunMetrics]) -> Tuple[float, float, Optional[float]]:
-    """Mean ± std of the candidate runs' pass rate, and their mean cost-per-success."""
+def _after_stats(
+    runs: Sequence[RunMetrics],
+) -> Tuple[float, float, Optional[float], Optional[float]]:
+    """Mean ± std pass rate, mean cost-per-success, and mean per-task cost (objective)."""
     if not runs:
-        return 0.0, 0.0, None
+        return 0.0, 0.0, None, None
     pass_rates = [r.pass_rate for r in runs]
     mean = statistics.mean(pass_rates)
     std = statistics.stdev(pass_rates) if len(pass_rates) > 1 else 0.0
@@ -304,7 +308,9 @@ def _after_stats(runs: Sequence[RunMetrics]) -> Tuple[float, float, Optional[flo
         if r.cost_per_successful_task is not None
     ]
     cost = statistics.mean(costs) if costs else None
-    return mean, std, cost
+    per_task = [r.cost_per_task for r in runs if r.cost_per_task is not None]
+    per_task_cost = statistics.mean(per_task) if per_task else None
+    return mean, std, cost, per_task_cost
 
 
 def _unified_diff(original: Optional[str], new_content: str, target: str) -> str:
@@ -353,6 +359,7 @@ def _default_eval_seed(split: str) -> EvalSeedFn:
         return RunMetrics(
             pass_rate=metrics.pass_rate,
             cost_per_successful_task=metrics.cost_per_successful_task,
+            cost_per_task=metrics.cost_per_task,
         )
 
     return eval_fn

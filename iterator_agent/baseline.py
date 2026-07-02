@@ -30,6 +30,12 @@ class Distribution:
     cost_per_successful_task_mean: Optional[float]
     cost_per_successful_task_std: Optional[float]
     run_ids: Tuple[str, ...]
+    # Optimization objective: mean cost per task (total_cost / num_tasks). Low
+    # variance (~5% CV) vs cost-per-successful-task (~19% CV, dominated by the
+    # pass-count denominator), so real token savings are detectable at n=2.
+    # cost-per-successful-task above stays the *reported* headline metric.
+    cost_per_task_mean: Optional[float] = None
+    cost_per_task_std: Optional[float] = None
 
 
 def _parse_float(value: object) -> Optional[float]:
@@ -79,6 +85,7 @@ def load_distribution(
 
     pass_rates: List[float] = []
     costs: List[float] = []
+    per_task_costs: List[float] = []
     run_ids: List[str] = []
 
     with csv_path.open(newline="", encoding="utf-8") as handle:
@@ -93,6 +100,12 @@ def load_distribution(
             cost = _parse_float(row.get("cost_per_successful_task"))
             if cost is not None:
                 costs.append(cost)
+            # Objective input: mean cost per task for this run (denominator is the
+            # fixed task count, so no pass-count noise leaks into the metric).
+            total_cost = _parse_float(row.get("total_cost_usd"))
+            num_tasks = _parse_float(row.get("num_tasks"))
+            if total_cost is not None and num_tasks:
+                per_task_costs.append(total_cost / num_tasks)
 
     if not pass_rates:
         raise ValueError(
@@ -104,6 +117,10 @@ def load_distribution(
         cost_mean, cost_std = _mean_std(costs)
     else:
         cost_mean, cost_std = None, None
+    if per_task_costs:
+        per_task_mean, per_task_std = _mean_std(per_task_costs)
+    else:
+        per_task_mean, per_task_std = None, None
 
     return Distribution(
         split=split,
@@ -114,4 +131,6 @@ def load_distribution(
         cost_per_successful_task_mean=cost_mean,
         cost_per_successful_task_std=cost_std,
         run_ids=tuple(run_ids),
+        cost_per_task_mean=per_task_mean,
+        cost_per_task_std=per_task_std,
     )
