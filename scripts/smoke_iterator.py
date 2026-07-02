@@ -54,6 +54,8 @@ INITIAL_BEST = Distribution(
     cost_per_successful_task_mean=0.10,
     cost_per_successful_task_std=0.01,
     run_ids=(),
+    cost_per_task_mean=0.10,
+    cost_per_task_std=0.01,
 )
 
 # Per-seed fake metrics. Iteration 1 (seeds 9001/9002) beats the $0.10 baseline at
@@ -108,7 +110,9 @@ def _make_eval_seed():
 
     def eval_seed(seed: int) -> RunMetrics:
         pass_rate, cost = SEED_METRICS[seed]
-        return RunMetrics(pass_rate=pass_rate, cost_per_successful_task=cost)
+        return RunMetrics(
+            pass_rate=pass_rate, cost_per_successful_task=cost, cost_per_task=cost
+        )
 
     return eval_seed
 
@@ -121,7 +125,7 @@ def _eval_must_not_run(seed: int) -> RunMetrics:
 def _eval_no_improvement(seed: int) -> RunMetrics:
     """Eval fn whose cost exceeds the baseline — forces a reject (revert) for Scenario D."""
     _ = seed  # constant metrics regardless of seed
-    return RunMetrics(pass_rate=0.6, cost_per_successful_task=0.2)
+    return RunMetrics(pass_rate=0.6, cost_per_successful_task=0.2, cost_per_task=0.2)
 
 
 def _seed_working_tree(repo_root: Path) -> None:
