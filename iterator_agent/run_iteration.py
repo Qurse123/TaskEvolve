@@ -25,7 +25,7 @@ import statistics
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Optional, Sequence, Tuple, Union
 
 from iterator_agent.acceptance import (
     AcceptanceDecision,
@@ -54,6 +54,9 @@ from iterator_agent.researcher import (
 )
 from results.logger import DEFAULT_LOGS_ROOT
 from settings import config
+
+if TYPE_CHECKING:
+    from iterator_agent.hypothesis import Ticket
 
 # Per-seed eval: a seed in, that proxy run's headline metrics out.
 EvalSeedFn = Callable[[int], RunMetrics]
@@ -94,6 +97,7 @@ def run_iteration(
     experiments_dir: Union[str, Path] = DEFAULT_EXPERIMENTS_DIR,
     logs_root: Union[str, Path] = DEFAULT_LOGS_ROOT,
     commit: Optional[Callable[[IterationResult], None]] = None,
+    ticket: Optional["Ticket"] = None,
 ) -> IterationResult:
     """Run one propose -> guard -> proxy x2 -> accept/revert cycle (experiment.md §21).
 
@@ -114,9 +118,11 @@ def run_iteration(
     current_version = current_version or config.HARNESS_VERSION
     if best is None:
         best = load_distribution(split, current_version)
-    if feedback is None:
-        # Diagnose the CURRENT-BEST harness's latest run (not whatever ran last, which
-        # mid-loop is the previous rejected candidate) — see feedback.build_feedback.
+    if feedback is None and ticket is None:
+        # Only the free-form (no-ticket) editor path reads feedback for its diagnose
+        # step; when a ticket drives the iteration the ticket IS the diagnosis, so we
+        # skip the (otherwise unused) run-folder read. Diagnose the CURRENT-BEST
+        # harness's latest run — see feedback.build_feedback.
         feedback = build_feedback(
             split, harness_version=current_version, logs_root=logs_root
         )
@@ -137,6 +143,7 @@ def run_iteration(
         complete=editor_complete,
         repo_root=repo_root,
         history=history,
+        ticket=ticket,
     )
     # Per-iteration delta, so a tracker reused across iterations (the driver) still
     # attributes only this iteration's editor cost.
@@ -162,6 +169,7 @@ def run_iteration(
             iterations_root=iterations_root,
             experiments_dir=experiments_dir,
             commit=commit,
+            ticket=ticket,
         )
 
     # 6. Apply the change; tag candidate evals with the bumped version.
@@ -196,6 +204,7 @@ def run_iteration(
         iterations_root=iterations_root,
         experiments_dir=experiments_dir,
         commit=commit,
+        ticket=ticket,
     )
 
 
@@ -240,6 +249,7 @@ def _persist(
     iterations_root: Union[str, Path],
     experiments_dir: Union[str, Path],
     commit: Optional[Callable[[IterationResult], None]],
+    ticket: Optional["Ticket"] = None,
 ) -> IterationResult:
     """Build the §22 record, write it + the changelog + the change diff, commit on accept."""
     after_mean, after_std, after_cost, after_per_task = _after_stats(runs)
@@ -265,6 +275,8 @@ def _persist(
         agent_model=agent_model,
         cost_per_task_before=best.cost_per_task_mean,
         cost_per_task_after=after_per_task,
+        ticket_id=ticket.ticket_id if ticket is not None else "",
+        hypothesis=ticket.hypothesis if ticket is not None else "",
     )
     record_path = write_record(record, logs_root=iterations_root)
     changelog_path = append_changelog(record, experiments_dir=experiments_dir)
