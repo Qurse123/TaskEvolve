@@ -258,7 +258,7 @@ def _group_by_arm(points: Sequence[RunPoint]) -> "OrderedDict[str, List[RunPoint
 class IterationPoint(NamedTuple):
     """One iterator iteration, parsed from its iteration.json record."""
 
-    index: int
+    iteration: int
     accepted: bool
     cost_per_task: Optional[float]
     pass_rate: float
@@ -284,7 +284,7 @@ def load_iterations(iterations_root: Path) -> List[IterationPoint]:
         record = json.loads(record_path.read_text(encoding="utf-8"))
         points.append(
             IterationPoint(
-                index=_iteration_index(record.get("iteration_id", "")),
+                iteration=_iteration_index(record.get("iteration_id", "")),
                 accepted=record.get("accepted_or_rejected") == "accepted",
                 cost_per_task=record.get("cost_per_task_after"),
                 pass_rate=float(record.get("proxy_task_success_after_mean", 0.0)),
@@ -292,7 +292,7 @@ def load_iterations(iterations_root: Path) -> List[IterationPoint]:
                 hypothesis=record.get("hypothesis", ""),
             )
         )
-    return sorted(points, key=lambda p: p.index)
+    return sorted(points, key=lambda p: p.iteration)
 
 
 def plot_trajectory(
@@ -303,7 +303,7 @@ def plot_trajectory(
     Accepted iterations are filled and joined into the running-best line (the climb);
     rejected iterations are hollow markers at the value they attempted.
     """
-    ordered = sorted(points, key=lambda p: p.index)
+    ordered = sorted(points, key=lambda p: p.iteration)
     accepted = [p for p in ordered if p.accepted]
     rejected = [p for p in ordered if not p.accepted]
 
@@ -311,7 +311,7 @@ def plot_trajectory(
 
     # Objective panel: lower is better; the accepted line is the descending climb.
     _scatter_metric(cost_ax, accepted, rejected, attr="cost_per_task")
-    acc_cost = [(p.index, p.cost_per_task) for p in accepted if p.cost_per_task is not None]
+    acc_cost = [(p.iteration,p.cost_per_task) for p in accepted if p.cost_per_task is not None]
     if acc_cost:
         cost_ax.plot(*zip(*acc_cost), color="tab:green", linewidth=1.6, zorder=2)
     cost_ax.set_ylabel("Mean cost per task (USD) — lower is better")
@@ -321,7 +321,7 @@ def plot_trajectory(
 
     # Success guardrail panel.
     _scatter_metric(succ_ax, accepted, rejected, attr="pass_rate")
-    acc_succ = [(p.index, p.pass_rate) for p in accepted]
+    acc_succ = [(p.iteration,p.pass_rate) for p in accepted]
     if acc_succ:
         succ_ax.plot(*zip(*acc_succ), color="tab:green", linewidth=1.6, zorder=2)
     succ_ax.set_ylabel("Task success rate")
@@ -337,8 +337,8 @@ def plot_trajectory(
 
 def _scatter_metric(ax, accepted, rejected, *, attr: str) -> None:
     """Filled accepted vs hollow rejected markers for one metric on ``ax``."""
-    acc = [(p.index, getattr(p, attr)) for p in accepted if getattr(p, attr) is not None]
-    rej = [(p.index, getattr(p, attr)) for p in rejected if getattr(p, attr) is not None]
+    acc = [(p.iteration,getattr(p, attr)) for p in accepted if getattr(p, attr) is not None]
+    rej = [(p.iteration,getattr(p, attr)) for p in rejected if getattr(p, attr) is not None]
     if acc:
         ax.scatter(*zip(*acc), color="tab:green", s=70, marker="D",
                    edgecolors="black", zorder=4, label="accepted")
