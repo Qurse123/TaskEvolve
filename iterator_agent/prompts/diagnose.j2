@@ -6,11 +6,20 @@ Most recent proxy evaluation ({{ s.run_id }}):
 - tasks: {{ s.num_tasks }}, passed: {{ s.num_passed }}, failed: {{ s.num_failed }}
 - total cost: {{ "$%.4f"|format(s.total_cost_usd) if s.total_cost_usd is not none else "n/a" }}, mean cost per task: {{ "$%.4f"|format(s.total_cost_usd / s.num_tasks) if s.total_cost_usd is not none and s.num_tasks else "n/a" }}, cost per successful task: {{ "$%.4f"|format(s.cost_per_successful_task) if s.cost_per_successful_task is not none else "n/a" }}
 
+{% if s.mean_turns %}
+Aggregate cost levers: mean turns/task {{ "%.1f"|format(s.mean_turns) }}, mean tool calls/task {{ "%.1f"|format(s.mean_tool_calls) }}.
+{% endif %}
 Per-task cost levers (all tasks — passing tasks waste cost too):
 {% for t in s.tasks %}
 - {{ t.task_id }}: {{ "PASS" if t.passed else "FAIL" }}, cost={{ "$%.4f"|format(t.cost_usd) if t.cost_usd is not none else "n/a" }}, turns={{ t.turn_count }}, tool_calls={{ t.tool_call_count }}{% if not t.passed %}, termination={{ t.termination_reason }}{% endif %}
 {% endfor %}
 
+{% if s.tool_usage_counts %}
+Tool usage across the run (name: calls):
+{% for name, count in s.tool_usage_counts %}
+- {{ name }}: {{ count }}
+{% endfor %}
+{% endif %}
 Termination reasons among failures:
 {% for reason, count in s.termination_reason_counts %}
 - {{ reason }}: {{ count }}

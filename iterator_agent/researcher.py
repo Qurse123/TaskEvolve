@@ -25,6 +25,7 @@ from iterator_agent.feedback import FeedbackSummary
 from settings import config
 
 if TYPE_CHECKING:
+    from iterator_agent.hypothesis import Ticket
     from iterator_agent.iteration_log import IterationRecord
 
 # A pluggable text-completion call: prompt in, model response out.
@@ -170,23 +171,50 @@ def _default_complete(prompt: str) -> str:
     return _content_of(_litellm_raw(prompt))
 
 
+def _ticket_focus(ticket: "Ticket") -> str:
+    """Render a hypothesis ticket as the propose step's focus block (no LLM call).
+
+    When the backlog supplies a ticket, the ticket *is* the diagnosis, so the separate
+    diagnose LLM call is skipped and this text takes its place at the top of the propose
+    prompt — pinning the edit to the ticket's single target surface.
+    """
+    return (
+        f"Focus on this hypothesis (ticket {ticket.ticket_id}): {ticket.hypothesis}\n"
+        f"Rationale: {ticket.rationale}\n"
+        f"Expected effect: {ticket.expected_effect}\n"
+        f"You MUST edit exactly this file: {ticket.target_surface}"
+    )
+
+
 def run_editor(
-    feedback: FeedbackSummary,
+    feedback: Optional[FeedbackSummary],
     *,
     policy: Optional[EditPolicy] = None,
     complete: Optional[CompletionFn] = None,
     repo_root: Union[str, Path] = Path("."),
     history: Sequence["IterationRecord"] = (),
+    ticket: Optional["Ticket"] = None,
 ) -> ProposedEdit:
-    """Diagnose the failures, then propose exactly one edit to one allowed file.
+    """Propose exactly one edit to one allowed file.
 
-    ``history`` (prior accepted + rejected iteration records) is shown to the editor
-    so it does not repeat rejected ideas and can build on accepted ones.
+    With a ``ticket`` (from the hypothesis backlog), the ticket is the diagnosis: the
+    diagnose LLM call is skipped and the propose step is pinned to the ticket's single
+    target surface. Without a ticket, fall back to the free-form diagnose -> propose
+    path. ``history`` (prior accepted + rejected records) is shown so the editor does
+    not repeat rejected ideas and can build on accepted ones.
     """
     policy = policy if policy is not None else load_policy()
     complete = complete if complete is not None else _default_complete
+    all_files = _read_allowed_files(policy, Path(repo_root))
 
-    diagnosis = complete(render_diagnose(feedback, history))
-    allowed_files = _read_allowed_files(policy, Path(repo_root))
+    if ticket is not None:
+        diagnosis = _ticket_focus(ticket)
+        allowed_files = [(p, c) for (p, c) in all_files if p == ticket.target_surface]
+    else:
+        if feedback is None:
+            raise ValueError("run_editor requires feedback when no ticket is given")
+        diagnosis = complete(render_diagnose(feedback, history))
+        allowed_files = all_files
+
     raw = complete(render_propose(diagnosis, allowed_files))
     return parse_proposal(raw)
