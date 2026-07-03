@@ -199,6 +199,42 @@ def test_run_editor_returns_proposed_edit(tmp_path):
     assert "OLD PROMPT" in fake.prompts[1]
 
 
+def test_run_editor_with_ticket_skips_diagnose_and_pins_target(tmp_path):
+    from iterator_agent.hypothesis import Ticket
+
+    # Two editable files exist; the ticket targets only the prompt.
+    prompt_file = tmp_path / "target_agent" / "prompts" / "system_prompt.j2"
+    prompt_file.parent.mkdir(parents=True)
+    prompt_file.write_text("OLD PROMPT", encoding="utf-8")
+    routing_file = tmp_path / "target_agent" / "model_routing.py"
+    routing_file.write_text("ROUTING CODE", encoding="utf-8")
+    policy = EditPolicy(
+        allowed_paths=frozenset(
+            {"target_agent/prompts/system_prompt.j2", "target_agent/model_routing.py"}
+        ),
+        forbidden_prefixes=(),
+    )
+    ticket = Ticket(
+        ticket_id="t1",
+        hypothesis="UNIQUE_HYPOTHESIS_TEXT",
+        target_surface="target_agent/prompts/system_prompt.j2",
+        rationale="verbose prompt",
+        expected_effect="lower cost",
+        priority=1,
+    )
+    fake = _FakeLLM([_VALID_JSON])  # only ONE response needed — no diagnose call
+
+    edit = run_editor(FEEDBACK, policy=policy, complete=fake, repo_root=tmp_path, ticket=ticket)
+
+    assert edit.new_content == "NEW PROMPT"
+    # Exactly one LLM call (propose only); the diagnose call was skipped.
+    assert len(fake.prompts) == 1
+    # The propose prompt carried the ticket focus and only the target file's content.
+    assert "UNIQUE_HYPOTHESIS_TEXT" in fake.prompts[0]
+    assert "OLD PROMPT" in fake.prompts[0]
+    assert "ROUTING CODE" not in fake.prompts[0]
+
+
 def _fake_response(content: str, cost):
     """A LiteLLM-shaped response object: message content + hidden cost param."""
     hidden = {"response_cost": cost} if cost is not None else {}
