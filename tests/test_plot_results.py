@@ -180,7 +180,7 @@ def test_load_iterations_orders_by_index_and_parses_verdict(tmp_path):
 
     points = load_iterations(tmp_path)
 
-    assert [p.index for p in points] == [1, 2]  # sorted by iteration index
+    assert [p.iteration for p in points] == [1, 2]  # sorted by iteration index
     assert [p.accepted for p in points] == [False, True]
     assert points[1].cost_per_task == pytest.approx(0.045)
 

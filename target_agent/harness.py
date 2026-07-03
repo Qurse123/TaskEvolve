@@ -19,10 +19,20 @@ def build_messages(
 ) -> list[Message]:
     """Return the full message list to pass to generate().
 
-    M1: pass-through — system + history with no compression.
-    Iterator can add sliding-window or summary compression here.
+    M2: compress history if it grows large by summarizing older messages.
+    Keep the last 6 messages verbatim; if more, prepend a summary message.
     """
-    return [*system_messages, *history]
+    MAX_HISTORY = 6
+    if len(history) <= MAX_HISTORY:
+        return [*system_messages, *history]
+    else:
+        # Summarize older messages
+        old_history = history[:-MAX_HISTORY]
+        recent_history = history[-MAX_HISTORY:]
+        # Simple summary: just note the number of omitted messages
+        summary_content = f"[Summary: {len(old_history)} earlier messages omitted for brevity.]"
+        summary_msg = SystemMessage(content=summary_content)
+        return [*system_messages, summary_msg, *recent_history]
 
 
 def filter_tools(tools: list[Tool]) -> list[Tool]:
