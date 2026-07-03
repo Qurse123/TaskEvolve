@@ -58,13 +58,36 @@ def _proposal_json() -> str:
     )
 
 
+def _ticket(index: int = 1):
+    """A hypothesis ticket pinned to the one editable file the tests rewrite."""
+    from iterator_agent.hypothesis import Ticket
+
+    return Ticket(
+        ticket_id=f"t{index}",
+        hypothesis="trim verbose prompt",
+        target_surface=ALLOWED_TARGET,
+        rationale="input tokens",
+        expected_effect="lower cost",
+        priority=index,
+    )
+
+
+def _fake_backlog(*, cost: float = 0.0, size: int = 1, history_sink=None):
+    """Backlog provider stub: returns `size` tickets + `cost`; records history seen."""
+
+    def provide(current_version: str, history):
+        if history_sink is not None:
+            history_sink.append(list(history))
+        return tuple(_ticket(i + 1) for i in range(size)), cost
+
+    return provide
+
+
 def _fake_complete():
-    """Two-call editor stub (diagnose, propose), reused across iterations."""
-    state = {"n": 0}
+    """Editor stub: with a ticket the editor makes one (propose) call — return JSON."""
 
     def complete(prompt: str) -> str:
-        state["n"] += 1
-        return "diagnosis" if state["n"] % 2 == 1 else _proposal_json()
+        return _proposal_json()
 
     return complete
 
@@ -80,7 +103,7 @@ class _CostingComplete:
     def __call__(self, prompt: str) -> str:
         self._n += 1
         self.total_cost_usd += self._cost
-        return "diagnosis" if self._n % 2 == 1 else _proposal_json()
+        return _proposal_json()
 
 
 def _eval_seq(costs, pass_rate: float = 0.667):
@@ -133,6 +156,7 @@ def _run_iterator(tmp_path: Path, *, complete, eval_fn, **kwargs):
         initial_version="v0.1",
         complete=complete,
         eval_seed=eval_fn,
+        generate_backlog=kwargs.pop("generate_backlog", _fake_backlog()),
         iterations_root=tmp_path / "iterations",
         experiments_dir=tmp_path / "experiments",
         logs_root=_seed_proxy_log(tmp_path / "logs"),
@@ -184,9 +208,9 @@ def test_reject_keeps_previous_best(tmp_path: Path) -> None:
 
 
 def test_search_cost_budget_stops_loop_early(tmp_path: Path) -> None:
-    # Arrange: $0.02 search cost per iteration (2 editor calls x $0.01); cap at $0.03.
+    # Arrange: $0.02 search cost per iteration (one editor call x $0.02); cap at $0.03.
     eval_fn, _ = _eval_seq([0.09, 0.09, 0.09, 0.09])
-    complete = _CostingComplete(cost_per_call=0.01)
+    complete = _CostingComplete(cost_per_call=0.02)
 
     # Act
     results = _run_iterator(
@@ -199,23 +223,20 @@ def test_search_cost_budget_stops_loop_early(tmp_path: Path) -> None:
     assert sum(r.search_cost_usd for r in results) == pytest.approx(0.04)
 
 
-def test_history_accumulates_and_reaches_editor(tmp_path: Path) -> None:
-    # Both iterations reject; iter 2's editor must see iter 1's change in its diagnosis.
-    prompts: list = []
-
-    def complete(prompt: str) -> str:
-        prompts.append(prompt)
-        return _proposal_json() if "JSON object" in prompt else "diagnosis"
-
+def test_history_accumulates_and_reaches_backlog(tmp_path: Path) -> None:
+    # Both iterations reject; iter 2's backlog generation must see iter 1's change.
+    histories: list = []
     eval_fn, _ = _eval_seq([0.09, 0.09])  # > best 0.083 -> reject each iteration
 
-    _run_iterator(tmp_path, complete=complete, eval_fn=eval_fn, max_iterations=2)
+    _run_iterator(
+        tmp_path, complete=_fake_complete(), eval_fn=eval_fn, max_iterations=2,
+        generate_backlog=_fake_backlog(history_sink=histories),
+    )
 
-    diagnose_prompts = [p for p in prompts if "JSON object" not in p]
-    assert len(diagnose_prompts) == 2
-    # Iteration 1 had no prior history; iteration 2 is told what iteration 1 tried.
-    assert "Tighten guidance." not in diagnose_prompts[0]
-    assert "Tighten guidance." in diagnose_prompts[1]
+    # Iteration 1 had no prior history; iteration 2's backlog was given iter 1's record.
+    assert len(histories) == 2
+    assert histories[0] == []
+    assert histories[1] and histories[1][0].change_summary == "Tighten guidance."
 
 
 def test_main_rejects_nonpositive_iterations(tmp_path: Path) -> None:
@@ -223,3 +244,43 @@ def test_main_rejects_nonpositive_iterations(tmp_path: Path) -> None:
 
     with pytest.raises(SystemExit):
         main(["--max-iterations", "0", "--seed-start", "1001"])
+
+
+def _fake_clock(step: float):
+    """Monotonic-clock stub advancing by `step` seconds each call (first call = 0)."""
+    state = {"v": -step}
+
+    def clock() -> float:
+        state["v"] += step
+        return state["v"]
+
+    return clock
+
+
+def test_stops_at_max_minutes_deadline(tmp_path: Path) -> None:
+    # Arrange: clock advances 50s/check; a 2-minute (120s) budget crosses on the
+    # 3rd deadline check, so only 2 iterations run despite a higher iteration cap.
+    eval_fn, _ = _eval_seq([0.09, 0.09, 0.09, 0.09, 0.09])  # always reject
+
+    # Act
+    results = _run_iterator(
+        tmp_path, complete=_fake_complete(), eval_fn=eval_fn,
+        max_iterations=5, max_minutes=2.0, clock=_fake_clock(50),
+    )
+
+    # Assert: the wall-clock deadline stopped the loop before the iteration cap.
+    assert len(results) == 2
+
+
+def test_iteration_cap_still_bounds_when_time_budget_generous(tmp_path: Path) -> None:
+    # Arrange: a huge time budget never trips; the iteration cap is the binding bound.
+    eval_fn, _ = _eval_seq([0.09, 0.09, 0.09])
+
+    # Act
+    results = _run_iterator(
+        tmp_path, complete=_fake_complete(), eval_fn=eval_fn,
+        max_iterations=3, max_minutes=10_000.0, clock=_fake_clock(1),
+    )
+
+    # Assert
+    assert len(results) == 3

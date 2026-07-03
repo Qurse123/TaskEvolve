@@ -7,6 +7,7 @@ Run from the repo root so the flat package layout is importable:
 from __future__ import annotations
 
 import csv
+import json
 from pathlib import Path
 
 import pytest
@@ -17,9 +18,11 @@ from scripts.plot_results import (
     _padded_range,
     _row_to_point,
     choose_mode,
+    load_iterations,
     load_points,
     plot_frontier,
     plot_per_metric,
+    plot_trajectory,
 )
 
 
@@ -147,4 +150,51 @@ def test_plot_frontier_writes_file(tmp_path):
     points = [_row_to_point(_row(pass_rate=str(p), cost=str(c)))
               for p, c in ((0.5, 0.6), (0.6667, 0.5))]
     out = plot_frontier([p for p in points if p], out_path=tmp_path / "fr.png")
+    assert out.exists() and out.stat().st_size > 0
+
+
+# --- trajectory --------------------------------------------------------------
+
+def _write_iteration(root: Path, iteration_id, *, accepted, cost, pass_rate,
+                     ticket_id="t1", hypothesis="trim") -> None:
+    folder = root / iteration_id
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "iteration.json").write_text(
+        json.dumps(
+            {
+                "iteration_id": iteration_id,
+                "accepted_or_rejected": "accepted" if accepted else "rejected",
+                "cost_per_task_after": cost,
+                "proxy_task_success_after_mean": pass_rate,
+                "ticket_id": ticket_id,
+                "hypothesis": hypothesis,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_load_iterations_orders_by_index_and_parses_verdict(tmp_path):
+    _write_iteration(tmp_path, "iter_0002", accepted=True, cost=0.045, pass_rate=0.75)
+    _write_iteration(tmp_path, "iter_0001", accepted=False, cost=0.060, pass_rate=0.58)
+
+    points = load_iterations(tmp_path)
+
+    assert [p.index for p in points] == [1, 2]  # sorted by iteration index
+    assert [p.accepted for p in points] == [False, True]
+    assert points[1].cost_per_task == pytest.approx(0.045)
+
+
+def test_load_iterations_raises_when_missing(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        load_iterations(tmp_path / "nope")
+
+
+def test_plot_trajectory_writes_file(tmp_path):
+    _write_iteration(tmp_path, "iter_0001", accepted=True, cost=0.070, pass_rate=0.70)
+    _write_iteration(tmp_path, "iter_0002", accepted=False, cost=0.075, pass_rate=0.66)
+    _write_iteration(tmp_path, "iter_0003", accepted=True, cost=0.060, pass_rate=0.72)
+
+    out = plot_trajectory(load_iterations(tmp_path), out_path=tmp_path / "traj.png")
+
     assert out.exists() and out.stat().st_size > 0
