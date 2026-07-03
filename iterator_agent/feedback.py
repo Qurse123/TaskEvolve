@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import csv
 import json
+import statistics
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,9 +21,11 @@ from typing import List, Optional, Tuple, Union
 
 from results.logger import DEFAULT_LOGS_ROOT, DEFAULT_RESULTS_CSV, _safe
 
-# How many of the costliest tasks get a transcript digest in the feedback, and how
-# far each message is truncated — both bound the editor's (iterator search) cost.
-NUM_EXPENSIVE_DIGESTS = 2
+# How many of the costliest tasks get a transcript digest in the feedback, plus a few
+# representative FAILED tasks (success-floor risk lives there), and how far each message
+# is truncated — all bound the editor's (iterator search) cost.
+NUM_EXPENSIVE_DIGESTS = 3
+NUM_FAILED_DIGESTS = 2
 DIGEST_MAX_CHARS = 200
 
 
@@ -58,6 +61,11 @@ class FeedbackSummary:
     total_cost_usd: Optional[float] = None
     cost_per_successful_task: Optional[float] = None
     expensive_digests: Tuple[Tuple[str, str], ...] = ()
+    # Aggregate cost levers across the run — where the search should look for waste.
+    # Default-safe so hand-built summaries (tests) that omit them still construct.
+    tool_usage_counts: Tuple[Tuple[str, int], ...] = ()
+    mean_turns: float = 0.0
+    mean_tool_calls: float = 0.0
 
 
 def find_latest_run_dir(
@@ -159,26 +167,62 @@ def _render_message(message: dict) -> str:
     return f"{role}: {content}"
 
 
-def _load_transcript_digest(run_dir: Path, task_id: str) -> Optional[str]:
-    """Render a compact turn-by-turn digest of a task's transcript, if persisted."""
+def _load_transcript_messages(run_dir: Path, task_id: str) -> List[dict]:
+    """Return a task's persisted transcript messages ([] when none was written)."""
     path = run_dir / f"task_{_safe(task_id)}_messages.json"
     if not path.exists():
+        return []
+    return json.loads(path.read_text(encoding="utf-8")).get("messages") or []
+
+
+def _load_transcript_digest(run_dir: Path, task_id: str) -> Optional[str]:
+    """Render a compact turn-by-turn digest of a task's transcript, if persisted."""
+    messages = _load_transcript_messages(run_dir, task_id)
+    if not messages:
         return None
-    messages = json.loads(path.read_text(encoding="utf-8")).get("messages") or []
     return "\n".join(_render_message(m) for m in messages)
+
+
+def _tool_usage_counts(
+    run_dir: Path, tasks: List[TaskRecord]
+) -> Tuple[Tuple[str, int], ...]:
+    """Count tool-call names across every task transcript (which tools dominate cost)."""
+    counter: "Counter[str]" = Counter()
+    for task in tasks:
+        for message in _load_transcript_messages(run_dir, task.task_id):
+            for call in message.get("tool_calls") or []:
+                counter[str(call.get("name", "?"))] += 1
+    # Most-used first; ties broken by name for a stable, testable order.
+    return tuple(sorted(counter.items(), key=lambda kv: (-kv[1], kv[0])))
 
 
 def _expensive_digests(
     run_dir: Path, tasks: List[TaskRecord]
 ) -> Tuple[Tuple[str, str], ...]:
-    """Digests for the ``NUM_EXPENSIVE_DIGESTS`` costliest tasks (concrete waste evidence)."""
+    """Digests for the costliest tasks plus a few representative failures.
+
+    Cost waste is not only in the priciest tasks — failures drive success-floor risk,
+    so the costliest ``NUM_FAILED_DIGESTS`` failing tasks not already shown are appended.
+    """
     with_cost = sorted(
         (t for t in tasks if t.cost_usd is not None),
         key=lambda t: t.cost_usd or 0.0,
         reverse=True,
     )
     digests: List[Tuple[str, str]] = []
+    chosen: set = set()
     for task in with_cost[:NUM_EXPENSIVE_DIGESTS]:
+        digest = _load_transcript_digest(run_dir, task.task_id)
+        if digest:
+            digests.append((task.task_id, digest))
+            chosen.add(task.task_id)
+
+    failing = sorted(
+        (t for t in tasks if not t.passed and t.task_id not in chosen),
+        key=lambda t: t.cost_usd or 0.0,
+        reverse=True,
+    )
+    for task in failing[:NUM_FAILED_DIGESTS]:
         digest = _load_transcript_digest(run_dir, task.task_id)
         if digest:
             digests.append((task.task_id, digest))
@@ -206,6 +250,10 @@ def summarize_run(run_dir: Union[str, Path]) -> FeedbackSummary:
     cost_per_success = (
         total_cost / num_passed if (total_cost is not None and num_passed) else None
     )
+    mean_turns = statistics.mean([t.turn_count for t in tasks]) if tasks else 0.0
+    mean_tool_calls = (
+        statistics.mean([t.tool_call_count for t in tasks]) if tasks else 0.0
+    )
 
     split = run_dir.name.split("_", 1)[0]
     return FeedbackSummary(
@@ -222,6 +270,9 @@ def summarize_run(run_dir: Union[str, Path]) -> FeedbackSummary:
             round(cost_per_success, 6) if cost_per_success is not None else None
         ),
         expensive_digests=_expensive_digests(run_dir, tasks),
+        tool_usage_counts=_tool_usage_counts(run_dir, tasks),
+        mean_turns=mean_turns,
+        mean_tool_calls=mean_tool_calls,
     )
 
 

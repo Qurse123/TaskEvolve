@@ -68,6 +68,10 @@ class IterationRecord:
     # reported headline.
     cost_per_task_before: Optional[float] = None
     cost_per_task_after: Optional[float] = None
+    # Which hypothesis-backlog ticket drove this iteration (empty for the free-form
+    # diagnose path). Surfaced on the trajectory plot so the climb is auditable.
+    ticket_id: str = ""
+    hypothesis: str = ""
 
 
 def iteration_dir(
