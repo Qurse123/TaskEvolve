@@ -37,6 +37,7 @@ from iterator_agent.acceptance import RunMetrics
 from iterator_agent.baseline import Distribution
 from iterator_agent.edit_guard import load_policy
 from iterator_agent.feedback import build_feedback
+from iterator_agent.hypothesis import Ticket
 from iterator_agent.run_iteration import run_iteration
 from results.logger import DEFAULT_LOGS_ROOT
 from scripts.run_iterator import run_iterator
@@ -74,7 +75,7 @@ ALLOWED_TARGET = "target_agent/prompts/system_prompt.j2"
 FORBIDDEN_TARGET = "benchmark/splits/proxy.json"
 
 # Number of _check() assertions in run_smoke_iterator — keeps the summary line honest.
-_TOTAL_CHECKS = 15
+_TOTAL_CHECKS = 16
 
 
 def _proposal_json(target: str) -> str:
@@ -103,6 +104,28 @@ def _make_complete(target: str):
         return payload
 
     return complete
+
+
+def _make_backlog(history_sink: List):
+    """Injected backlog provider: one ticket pinned to ALLOWED_TARGET, records history.
+
+    Keeps the smoke at $0 (no real generate_tickets LLM call) and lets us assert the
+    editor's cross-iteration memory reaches the backlog generator.
+    """
+
+    def provide(current_version: str, history) -> Tuple[Tuple[Ticket, ...], float]:
+        history_sink.append(list(history))
+        ticket = Ticket(
+            ticket_id="t1",
+            hypothesis="Trim the system prompt to reduce per-turn token cost.",
+            target_surface=ALLOWED_TARGET,
+            rationale="verbose prompt re-read every turn",
+            expected_effect="lower mean cost per task, success held",
+            priority=1,
+        )
+        return (ticket,), 0.0
+
+    return provide
 
 
 def _make_eval_seed():
@@ -186,6 +209,7 @@ def run_smoke_iterator() -> int:
 
         committed: List[str] = []
         editor_prompts: List[str] = []
+        backlog_histories: List = []
         base_complete = _make_complete(ALLOWED_TARGET)
 
         def editor_complete(prompt: str) -> str:
@@ -202,6 +226,7 @@ def run_smoke_iterator() -> int:
             initial_version="v0.1",
             complete=editor_complete,
             eval_seed=_make_eval_seed(),
+            generate_backlog=_make_backlog(backlog_histories),
             commit=lambda r: committed.append(r.iteration_id),
             iterations_root=iterations_root,
             experiments_dir=experiments_dir,
@@ -245,13 +270,18 @@ def run_smoke_iterator() -> int:
             "edited file holds the accepted content (kept on accept; iter 2's revert is a no-op since it re-proposed the same edit)",
             target_path.read_text(encoding="utf-8") == accept.proposed_edit.new_content,
         )
-        # Editor memory: iteration 2's diagnosis must cite iteration 1's accepted change.
-        diagnose_prompts = [p for p in editor_prompts if "JSON object" not in p]
+        # Backlog memory: iteration 2's backlog generation must see iteration 1's record.
         failures += not _check(
-            "editor memory: iteration 2 diagnosis cites iteration 1's accepted change",
-            len(diagnose_prompts) >= 2
-            and accept.proposed_edit.change_summary in diagnose_prompts[1]
-            and accept.proposed_edit.change_summary not in diagnose_prompts[0],
+            "backlog memory: iteration 2 backlog sees iteration 1's accepted change",
+            len(backlog_histories) == 2
+            and backlog_histories[0] == []
+            and bool(backlog_histories[1])
+            and backlog_histories[1][0].change_summary == accept.proposed_edit.change_summary,
+        )
+        # Ticket focus: the editor's (single) propose call carried the ticket hypothesis.
+        failures += not _check(
+            "editor propose prompt carried the ticket hypothesis (diagnose skipped)",
+            any("Trim the system prompt" in p for p in editor_prompts),
         )
         # Change tracking: the exact edit diff is captured for the accepted iteration.
         accept_diff = iterations_root / accept.iteration_id / "change.diff"

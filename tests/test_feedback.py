@@ -178,6 +178,61 @@ def test_expensive_digests_render_costliest_transcripts(tmp_path):
     assert "order #123 found" in digest
 
 
+def _write_transcript(run_dir: Path, task_id: str, tool_names) -> None:
+    (run_dir / f"task_{task_id}_messages.json").write_text(
+        json.dumps(
+            {
+                "messages": [
+                    {"role": "assistant", "content": None,
+                     "tool_calls": [{"name": name}]}
+                    for name in tool_names
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_summary_reports_aggregate_cost_levers(tmp_path):
+    run_id = _make_run(
+        tmp_path, "proxy", _at(1),
+        [
+            _result("t1", passed=True, reward=1.0, cost=0.1, turns=4, tool_calls=2),
+            _result("t2", passed=False, reward=0.0, cost=0.2, turns=8, tool_calls=6, term="max_steps"),
+        ],
+    )
+    run_dir = tmp_path / run_id
+    _write_transcript(run_dir, "t1", ["get_order_details"])
+    _write_transcript(run_dir, "t2", ["get_order_details", "get_user_details", "get_order_details"])
+
+    summary = summarize_run(run_dir)
+
+    # Aggregate turn/tool means across all tasks.
+    assert summary.mean_turns == pytest.approx(6.0)
+    assert summary.mean_tool_calls == pytest.approx(4.0)
+    # Tool histogram: most-used first, ties broken by name.
+    assert summary.tool_usage_counts == (("get_order_details", 3), ("get_user_details", 1))
+
+
+def test_expensive_digests_include_representative_failures(tmp_path):
+    # One pricey PASS and one cheaper FAIL: the failing task must still get a digest.
+    run_id = _make_run(
+        tmp_path, "proxy", _at(1),
+        [
+            _result("pricey_pass", passed=True, reward=1.0, cost=0.50),
+            _result("cheap_fail", passed=False, reward=0.0, cost=0.05, term="max_steps"),
+        ],
+    )
+    run_dir = tmp_path / run_id
+    _write_transcript(run_dir, "pricey_pass", ["get_order_details"])
+    _write_transcript(run_dir, "cheap_fail", ["get_user_details"])
+
+    summary = summarize_run(run_dir)
+
+    digested = {task_id for task_id, _ in summary.expensive_digests}
+    assert "cheap_fail" in digested  # failures are surfaced even when not costliest
+
+
 def test_load_run_tasks_ignores_messages_files(tmp_path):
     run_id = _make_run(
         tmp_path, "proxy", _at(1),

@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import logging
 import random
 import statistics
@@ -40,6 +41,7 @@ import matplotlib
 matplotlib.use("Agg")  # file output only; no interactive display needed
 import matplotlib.pyplot as plt  # noqa: E402  (must follow backend selection)
 
+from iterator_agent.iteration_log import DEFAULT_ITERATIONS_ROOT, RECORD_FILENAME
 from results.logger import DEFAULT_RESULTS_CSV
 
 logger = logging.getLogger(__name__)
@@ -253,6 +255,98 @@ def _group_by_arm(points: Sequence[RunPoint]) -> "OrderedDict[str, List[RunPoint
     return grouped
 
 
+class IterationPoint(NamedTuple):
+    """One iterator iteration, parsed from its iteration.json record."""
+
+    index: int
+    accepted: bool
+    cost_per_task: Optional[float]
+    pass_rate: float
+    ticket_id: str
+    hypothesis: str
+
+
+def _iteration_index(iteration_id: str) -> int:
+    """Extract the trailing integer from an iteration id (``iter_0007`` -> 7)."""
+    tail = iteration_id.rsplit("_", 1)[-1]
+    return int(tail) if tail.isdigit() else 0
+
+
+def load_iterations(iterations_root: Path) -> List[IterationPoint]:
+    """Read every ``<iter>/iteration.json`` into IterationPoints, ordered by index."""
+    if not iterations_root.exists():
+        raise FileNotFoundError(
+            f"Iterations dir not found at {iterations_root}. Run the iterator first "
+            "(python -m scripts.run_iterator ...)."
+        )
+    points: List[IterationPoint] = []
+    for record_path in iterations_root.glob(f"*/{RECORD_FILENAME}"):
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+        points.append(
+            IterationPoint(
+                index=_iteration_index(record.get("iteration_id", "")),
+                accepted=record.get("accepted_or_rejected") == "accepted",
+                cost_per_task=record.get("cost_per_task_after"),
+                pass_rate=float(record.get("proxy_task_success_after_mean", 0.0)),
+                ticket_id=record.get("ticket_id", ""),
+                hypothesis=record.get("hypothesis", ""),
+            )
+        )
+    return sorted(points, key=lambda p: p.index)
+
+
+def plot_trajectory(
+    points: Sequence[IterationPoint], *, out_path: Path, title: Optional[str] = None
+) -> Path:
+    """Render the hill-climb: objective (cost/task) and task success vs iteration.
+
+    Accepted iterations are filled and joined into the running-best line (the climb);
+    rejected iterations are hollow markers at the value they attempted.
+    """
+    ordered = sorted(points, key=lambda p: p.index)
+    accepted = [p for p in ordered if p.accepted]
+    rejected = [p for p in ordered if not p.accepted]
+
+    fig, (cost_ax, succ_ax) = plt.subplots(2, 1, figsize=(9, 8), sharex=True)
+
+    # Objective panel: lower is better; the accepted line is the descending climb.
+    _scatter_metric(cost_ax, accepted, rejected, attr="cost_per_task")
+    acc_cost = [(p.index, p.cost_per_task) for p in accepted if p.cost_per_task is not None]
+    if acc_cost:
+        cost_ax.plot(*zip(*acc_cost), color="tab:green", linewidth=1.6, zorder=2)
+    cost_ax.set_ylabel("Mean cost per task (USD) — lower is better")
+    cost_ax.set_title(title or "Iterator trajectory (◆ accepted = current-best climb)")
+    cost_ax.grid(True, alpha=0.3)
+    cost_ax.legend(fontsize=9)
+
+    # Success guardrail panel.
+    _scatter_metric(succ_ax, accepted, rejected, attr="pass_rate")
+    acc_succ = [(p.index, p.pass_rate) for p in accepted]
+    if acc_succ:
+        succ_ax.plot(*zip(*acc_succ), color="tab:green", linewidth=1.6, zorder=2)
+    succ_ax.set_ylabel("Task success rate")
+    succ_ax.set_xlabel("Iteration")
+    succ_ax.grid(True, alpha=0.3)
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    return out_path
+
+
+def _scatter_metric(ax, accepted, rejected, *, attr: str) -> None:
+    """Filled accepted vs hollow rejected markers for one metric on ``ax``."""
+    acc = [(p.index, getattr(p, attr)) for p in accepted if getattr(p, attr) is not None]
+    rej = [(p.index, getattr(p, attr)) for p in rejected if getattr(p, attr) is not None]
+    if acc:
+        ax.scatter(*zip(*acc), color="tab:green", s=70, marker="D",
+                   edgecolors="black", zorder=4, label="accepted")
+    if rej:
+        ax.scatter(*zip(*rej), facecolors="none", edgecolors="tab:red", s=55,
+                   zorder=3, label="rejected")
+
+
 def choose_mode(points: Sequence[RunPoint], *, frontier: bool, per_metric: bool) -> str:
     """Pick 'frontier' or 'per_metric'. Explicit flags win; else >=2 arms -> frontier."""
     if frontier and per_metric:
@@ -279,7 +373,7 @@ def _as_int(value: Optional[str]) -> Optional[int]:
 def _default_out_path(split: Optional[str], mode: str) -> Path:
     stamp = datetime.now(timezone.utc).strftime(PLOT_TIME_FORMAT)
     suffix = f"_{split}" if split else ""
-    stem = "frontier" if mode == "frontier" else "per_metric"
+    stem = mode if mode in ("frontier", "trajectory") else "per_metric"
     return DEFAULT_PLOTS_DIR / f"{stem}{suffix}_{stamp}.png"
 
 
@@ -294,9 +388,27 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--per-metric", action="store_true", help="Force the per-metric dot plot.")
     parser.add_argument("--from-zero", action="store_true",
                         help="Frontier only: anchor axes at the origin instead of auto-zoom.")
+    parser.add_argument("--trajectory", action="store_true",
+                        help="Plot the iterator hill-climb (cost + success vs iteration) "
+                        "from experiments/iterations/*/iteration.json instead of results.csv.")
+    parser.add_argument("--iterations-root", type=Path, default=DEFAULT_ITERATIONS_ROOT,
+                        help="Trajectory only: folder of per-iteration records.")
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+    if args.trajectory:
+        iterations = load_iterations(args.iterations_root)
+        if not iterations:
+            logger.error("No iteration records under %s.", args.iterations_root)
+            return 1
+        out_path = args.out or _default_out_path(args.split, "trajectory")
+        plot_trajectory(iterations, out_path=out_path)
+        accepts = sum(1 for p in iterations if p.accepted)
+        logger.info("Plotted %d iteration(s), %d accepted [trajectory] -> %s",
+                    len(iterations), accepts, out_path)
+        return 0
+
     points = load_points(args.csv, split=args.split)
     if not points:
         logger.error("No plottable runs in %s%s.", args.csv,
