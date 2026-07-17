@@ -15,7 +15,8 @@ from iterator_agent.acceptance import Guardrails, RunMetrics
 from iterator_agent.baseline import Distribution
 from iterator_agent.edit_guard import load_policy
 from iterator_agent.feedback import FeedbackSummary
-from iterator_agent.run_iteration import run_iteration
+from iterator_agent.preflight import PreflightResult
+from iterator_agent.run_iteration import proposal_hash, run_iteration
 from settings import config
 
 ALLOWED_TARGET = "target_agent/prompts/system_prompt.j2"
@@ -105,6 +106,10 @@ def _repo(tmp_path: Path) -> Path:
     return tmp_path
 
 
+def _pass_preflight(_root, _target):
+    return PreflightResult(True, "ok")
+
+
 def _run(tmp_path: Path, *, complete, eval_fn, **overrides):
     return run_iteration(
         iteration_id=overrides.pop("iteration_id", "iter_0001"),
@@ -119,6 +124,7 @@ def _run(tmp_path: Path, *, complete, eval_fn, **overrides):
         current_version=overrides.pop("current_version", "v0.1"),
         iterations_root=tmp_path / "iterations",
         experiments_dir=tmp_path / "experiments",
+        preflight=overrides.pop("preflight", _pass_preflight),
         **overrides,
     )
 
@@ -395,3 +401,114 @@ def test_record_captures_editor_and_agent_models(tmp_path: Path) -> None:
 
     assert record["editor_model"] == (config.ITERATOR_MODEL or "")
     assert record["agent_model"] == (config.AGENT_MODEL or "")
+
+
+def test_preflight_failure_rejects_and_reverts_before_eval(tmp_path: Path) -> None:
+    # AutoPK port: a structurally broken edit is rejected at $0 — the eval must
+    # never run, the file must be reverted, and the version must be restored.
+    def eval_fn(seed: int) -> RunMetrics:
+        raise AssertionError("eval must not run when preflight fails")
+
+    def failing_preflight(_root, target):
+        return PreflightResult(False, f"harness build_messages crashed (edit: {target})")
+
+    result = _run(
+        tmp_path,
+        complete=_fake_complete(_proposal_json()),
+        eval_fn=eval_fn,
+        preflight=failing_preflight,
+    )
+
+    assert result.accepted is False
+    assert "preflight" in result.decision.reason.lower()
+    assert result.harness_version == "v0.1"
+    assert config.HARNESS_VERSION == "v0.1"
+    assert (tmp_path / ALLOWED_TARGET).read_text() == ORIGINAL_CONTENT  # reverted
+    assert (tmp_path / "experiments" / "rejected_changes.md").exists()
+    # The attempted edit is still auditable.
+    diff = (tmp_path / "iterations" / "iter_0001" / "change.diff").read_text()
+    assert "IMPROVED PROMPT" in diff
+
+
+def test_duplicate_rejected_proposal_short_circuits(tmp_path: Path) -> None:
+    # AutoPK port (rejected-ticket memory / bounce-loop guard): an edit that is
+    # content-identical to a previously rejected one is refused without applying
+    # the edit, running preflight, or spending any eval.
+    def eval_fn(seed: int) -> RunMetrics:
+        raise AssertionError("eval must not run for a duplicate proposal")
+
+    def preflight(_root, _target):
+        raise AssertionError("preflight must not run for a duplicate proposal")
+
+    import json as _json
+    prior = _json.loads(_proposal_json())
+    from iterator_agent.researcher import ProposedEdit
+    prior_hash = proposal_hash(
+        ProposedEdit(
+            target_file=prior["target_file"],
+            new_content=prior["new_content"],
+            change_summary="different summary text",  # hash covers content, not prose
+            reason_for_change="different reason",
+        )
+    )
+
+    result = _run(
+        tmp_path,
+        complete=_fake_complete(_proposal_json()),
+        eval_fn=eval_fn,
+        preflight=preflight,
+        rejected_hashes=frozenset({prior_hash}),
+    )
+
+    assert result.accepted is False
+    assert "duplicate" in result.decision.reason.lower()
+    assert (tmp_path / ALLOWED_TARGET).read_text() == ORIGINAL_CONTENT  # never applied
+    assert (tmp_path / "experiments" / "rejected_changes.md").exists()
+
+
+def test_default_eval_seed_runs_fresh_process(monkeypatch, tmp_path: Path) -> None:
+    # The candidate edit may touch .py surfaces; an in-process eval would run
+    # stale imported modules. The default eval must therefore spawn a fresh
+    # interpreter, carry the candidate HARNESS_VERSION in its environment, and
+    # rebuild RunMetrics (incl. harness_error_count) from the metrics JSON.
+    from types import SimpleNamespace
+
+    from iterator_agent import run_iteration as ri
+
+    captured = {}
+
+    def fake_run(cmd, env=None, **kwargs):
+        captured["cmd"] = list(cmd)
+        captured["env"] = env
+        mpath = Path(cmd[cmd.index("--metrics-json") + 1])
+        mpath.write_text(json.dumps([{
+            "run_id": "r1", "seed": 3101, "pass_rate": 0.6,
+            "cost_per_successful_task": 0.08, "cost_per_task": 0.05,
+            "harness_error_count": 1,
+        }]), encoding="utf-8")
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(ri.subprocess, "run", fake_run)
+    config.HARNESS_VERSION = "v0.7"
+
+    metrics = ri._default_eval_seed("proxy")(3101)
+
+    assert metrics.pass_rate == 0.6
+    assert metrics.cost_per_task == 0.05
+    assert metrics.harness_error_count == 1
+    assert captured["env"]["HARNESS_VERSION"] == "v0.7"
+    assert "scripts.run_train_eval" in captured["cmd"]
+    assert captured["cmd"][captured["cmd"].index("--seed-start") + 1] == "3101"
+
+
+def test_default_eval_seed_raises_on_subprocess_failure(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from iterator_agent import run_iteration as ri
+
+    monkeypatch.setattr(
+        ri.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=3)
+    )
+
+    with pytest.raises(RuntimeError, match="exit 3"):
+        ri._default_eval_seed("proxy")(3101)
