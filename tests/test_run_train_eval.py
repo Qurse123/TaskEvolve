@@ -126,3 +126,82 @@ def test_run_one_repeat_records_failure_instead_of_aborting(monkeypatch, tmp_pat
         tmp_path / "task_good_messages.json",
         tmp_path / "task_bad_messages.json",
     }
+
+
+def test_run_one_repeat_counts_harness_errors(monkeypatch, tmp_path):
+    # A permanently failing task is recorded with a harness_error termination;
+    # the repeat's metrics must surface that count so the acceptance rule can
+    # treat the run as invalid (never accept what cannot be verified).
+    def fake_run_eval(task_id, *, split, domain, seed, transcript_path=None):
+        if task_id == "bad":
+            raise ValueError("broken harness edit")
+        return _ok_result(task_id)
+
+    monkeypatch.setattr(rte, "run_eval", fake_run_eval)
+    monkeypatch.setattr(rte.time, "sleep", lambda _s: None)
+    monkeypatch.setattr(
+        rte, "start_run", lambda split: SimpleNamespace(run_id="run_test", run_dir=tmp_path)
+    )
+    monkeypatch.setattr(rte, "log_task", lambda run, result: None)
+    monkeypatch.setattr(rte, "finalize_run", lambda run, results: None)
+
+    metrics = rte._run_one_repeat("validation", ["good", "bad"], domain="retail", seed=2001)
+
+    assert metrics.harness_error_count == 1
+
+
+def test_write_metrics_json_round_trips(tmp_path):
+    # The subprocess eval path reads this file to rebuild per-repeat metrics.
+    metrics = [
+        rte.RepeatMetrics(
+            run_id="r1", seed=3101, pass_rate=0.583,
+            cost_per_successful_task=0.083, cost_per_task=0.048,
+            harness_error_count=0,
+        ),
+        rte.RepeatMetrics(
+            run_id="r2", seed=3102, pass_rate=0.5,
+            cost_per_successful_task=None, cost_per_task=None,
+            harness_error_count=2,
+        ),
+    ]
+    out = tmp_path / "metrics.json"
+
+    rte.write_metrics_json(metrics, out)
+
+    import json
+    rows = json.loads(out.read_text(encoding="utf-8"))
+    assert rows[0] == {
+        "run_id": "r1", "seed": 3101, "pass_rate": 0.583,
+        "cost_per_successful_task": 0.083, "cost_per_task": 0.048,
+        "harness_error_count": 0,
+    }
+    assert rows[1]["cost_per_task"] is None
+    assert rows[1]["harness_error_count"] == 2
+
+
+def test_cli_metrics_json_flag(monkeypatch, tmp_path):
+    # --metrics-json writes the repeat metrics where the flag points.
+    out = tmp_path / "m.json"
+    recorded = {}
+
+    def fake_run_repeats(split, *, seed_start, repeats, domain=None):
+        recorded["args"] = (split, seed_start, repeats)
+        return [
+            rte.RepeatMetrics(
+                run_id="r1", seed=seed_start, pass_rate=1.0,
+                cost_per_successful_task=0.01, cost_per_task=0.01,
+                harness_error_count=0,
+            )
+        ]
+
+    monkeypatch.setattr(rte, "run_repeats", fake_run_repeats)
+
+    rte.main([
+        "--split", "proxy", "--seed-start", "3101", "--repeats", "1",
+        "--metrics-json", str(out),
+    ])
+
+    import json
+    rows = json.loads(out.read_text(encoding="utf-8"))
+    assert recorded["args"] == ("proxy", 3101, 1)
+    assert rows[0]["run_id"] == "r1"

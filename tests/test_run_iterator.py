@@ -16,6 +16,7 @@ import pytest
 from iterator_agent.acceptance import Guardrails, RunMetrics
 from iterator_agent.baseline import Distribution
 from iterator_agent.edit_guard import load_policy
+from iterator_agent.preflight import PreflightResult
 from scripts.run_iterator import run_iterator
 from settings import config
 
@@ -144,6 +145,10 @@ def _repo(tmp_path: Path) -> Path:
     return tmp_path
 
 
+def _pass_preflight(_root, _target):
+    return PreflightResult(True, "ok")
+
+
 def _run_iterator(tmp_path: Path, *, complete, eval_fn, **kwargs):
     return run_iterator(
         max_iterations=kwargs.pop("max_iterations", 3),
@@ -160,16 +165,37 @@ def _run_iterator(tmp_path: Path, *, complete, eval_fn, **kwargs):
         iterations_root=tmp_path / "iterations",
         experiments_dir=tmp_path / "experiments",
         logs_root=_seed_proxy_log(tmp_path / "logs"),
+        preflight=kwargs.pop("preflight", _pass_preflight),
         **kwargs,
     )
 
 
+def _varying_complete():
+    """Editor stub proposing *different* content each call (defeats the dedupe
+    guard, so tests can exercise repeated genuine rejections)."""
+    calls = {"n": 0}
+
+    def complete(prompt: str) -> str:
+        calls["n"] += 1
+        return json.dumps(
+            {
+                "target_file": ALLOWED_TARGET,
+                "new_content": f"IMPROVED PROMPT variant {calls['n']}\n",
+                "change_summary": f"Variant {calls['n']}.",
+                "reason_for_change": "wrong tool first.",
+            }
+        )
+
+    return complete
+
+
 def test_stops_at_max_iterations(tmp_path: Path) -> None:
-    # Arrange: every run costs more than best -> always reject.
+    # Arrange: every run costs more than best -> always reject (distinct edits,
+    # so the rejected-change dedupe guard does not short-circuit them).
     eval_fn, seen = _eval_seq([0.09, 0.09, 0.09])
 
     # Act
-    results = _run_iterator(tmp_path, complete=_fake_complete(), eval_fn=eval_fn, max_iterations=3)
+    results = _run_iterator(tmp_path, complete=_varying_complete(), eval_fn=eval_fn, max_iterations=3)
 
     # Assert: 3 iterations, all rejected; version never bumped; seed B skipped each time.
     assert len(results) == 3
@@ -199,7 +225,7 @@ def test_reject_keeps_previous_best(tmp_path: Path) -> None:
     eval_fn, _ = _eval_seq([0.07, 0.07, 0.09, 0.065, 0.065])
 
     # Act
-    results = _run_iterator(tmp_path, complete=_fake_complete(), eval_fn=eval_fn, max_iterations=3)
+    results = _run_iterator(tmp_path, complete=_varying_complete(), eval_fn=eval_fn, max_iterations=3)
 
     # Assert: accept, reject, accept; the rejected iter did not move the baseline.
     assert [r.accepted for r in results] == [True, False, True]
@@ -284,3 +310,34 @@ def test_iteration_cap_still_bounds_when_time_budget_generous(tmp_path: Path) ->
 
     # Assert
     assert len(results) == 3
+
+
+def test_duplicate_rejected_proposal_not_re_evaluated(tmp_path: Path) -> None:
+    # AutoPK port (rejected-ticket memory): the editor stub proposes the same
+    # edit every iteration. Iteration 1 rejects it via eval; iteration 2 must
+    # short-circuit on the driver's rejected-hash memory and spend no eval.
+    eval_fn, seen = _eval_seq([0.09])  # only one eval sample available
+
+    results = _run_iterator(
+        tmp_path, complete=_fake_complete(), eval_fn=eval_fn, max_iterations=2
+    )
+
+    assert len(results) == 2
+    assert seen == [1001]  # iteration 2 never reached the eval
+    assert "duplicate" in results[1].decision.reason.lower()
+
+
+def test_preflight_failure_spends_no_eval(tmp_path: Path) -> None:
+    def failing_preflight(_root, target):
+        return PreflightResult(False, f"broken candidate ({target})")
+
+    eval_fn, seen = _eval_seq([])  # any eval call would pop from empty and raise
+
+    results = _run_iterator(
+        tmp_path, complete=_fake_complete(), eval_fn=eval_fn,
+        max_iterations=1, preflight=failing_preflight,
+    )
+
+    assert seen == []
+    assert results[0].accepted is False
+    assert "preflight" in results[0].decision.reason.lower()
