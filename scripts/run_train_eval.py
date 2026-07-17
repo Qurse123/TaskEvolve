@@ -19,10 +19,11 @@ Seeds for a run are ``seed_start, seed_start+1, ..., seed_start+repeats-1``.
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import statistics
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional, Sequence
@@ -48,6 +49,9 @@ class RepeatMetrics:
     # Iterator optimization objective: total agent cost / task count (fixed
     # denominator, so no pass-count noise). None when no task reported a cost.
     cost_per_task: Optional[float] = None
+    # Tasks whose termination_reason marks a harness crash. Surfaced so the
+    # iterator's acceptance rule can treat the run as an invalid sample.
+    harness_error_count: int = 0
 
 
 def run_repeats(
@@ -171,11 +175,16 @@ def _run_one_repeat(
     pass_rate = sum(1 for r in results if r.passed) / len(results) if results else 0.0
     cost_per_success = _cost_per_successful_task(results)
     cost_per_task = _cost_per_task(results)
-    logger.info(
-        "  run %s (seed=%d): pass_rate=%.3f cost_per_success=%s cost_per_task=%s",
-        run.run_id, seed, pass_rate, _fmt(cost_per_success), _fmt(cost_per_task),
+    harness_errors = sum(
+        1 for r in results if r.termination_reason.startswith("harness_error")
     )
-    return RepeatMetrics(run.run_id, seed, pass_rate, cost_per_success, cost_per_task)
+    logger.info(
+        "  run %s (seed=%d): pass_rate=%.3f cost_per_success=%s cost_per_task=%s harness_errors=%d",
+        run.run_id, seed, pass_rate, _fmt(cost_per_success), _fmt(cost_per_task), harness_errors,
+    )
+    return RepeatMetrics(
+        run.run_id, seed, pass_rate, cost_per_success, cost_per_task, harness_errors
+    )
 
 
 def _cost_per_successful_task(results: Sequence[EvalResult]) -> Optional[float]:
@@ -224,6 +233,18 @@ def _fmt(value: Optional[float]) -> str:
     return f"{value:.6f}" if value is not None else "n/a"
 
 
+def write_metrics_json(metrics: Sequence[RepeatMetrics], path: Path) -> None:
+    """Write per-repeat metrics as JSON so a parent process can read them back.
+
+    This is the machine-readable channel for the iterator's fresh-process eval:
+    each candidate proxy run executes in its own interpreter (so edited harness
+    modules are actually imported), and the parent rebuilds RunMetrics from here.
+    """
+    rows = [asdict(m) for m in metrics]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(rows, indent=2), encoding="utf-8")
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description="Run a proxy/validation baseline as a mean ± std distribution."
@@ -237,18 +258,26 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
     parser.add_argument("--repeats", type=int, default=1, help="Number of repeats (M1 baseline: 5).")
     parser.add_argument("--domain", default=None, help="TAU2 domain (default: settings.config.DEFAULT_DOMAIN).")
+    parser.add_argument(
+        "--metrics-json",
+        default=None,
+        help="Optional path to write per-repeat metrics as JSON (used by the "
+        "iterator's fresh-process eval).",
+    )
     args = parser.parse_args(argv)
 
     if args.repeats < 1:
         parser.error("--repeats must be >= 1")
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    run_repeats(
+    metrics = run_repeats(
         args.split,
         seed_start=args.seed_start,
         repeats=args.repeats,
         domain=args.domain,
     )
+    if args.metrics_json:
+        write_metrics_json(metrics, Path(args.metrics_json))
     return 0
 
 
