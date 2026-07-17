@@ -150,3 +150,33 @@ def test_single_run_cannot_be_accepted():
 
     assert decision.accepted is False
     assert "two" in decision.reason.lower() or "2" in decision.reason
+
+
+def test_run_with_harness_errors_is_rejected_even_if_cost_improves():
+    # AutoPK port: never accept what cannot be verified. A run where tasks
+    # crashed in the harness (harness_error terminations) is an invalid sample —
+    # its "cost improvement" is an artifact of tasks doing no work.
+    run = RunMetrics(
+        pass_rate=0.60,
+        cost_per_successful_task=0.010,
+        cost_per_task=0.010,
+        harness_error_count=3,
+    )
+
+    check = check_run(run, BEST, GUARDRAILS)
+
+    assert check.passed is False
+    assert "harness" in check.reason.lower()
+
+
+def test_run_without_harness_errors_unaffected_by_new_field():
+    run = RunMetrics(
+        pass_rate=0.60,
+        cost_per_successful_task=0.080,
+        cost_per_task=0.080,
+        harness_error_count=0,
+    )
+
+    check = check_run(run, BEST, GUARDRAILS)
+
+    assert check.passed is True
