@@ -37,6 +37,10 @@ class RunMetrics:
     # denominator -> ~4x less variance than cost-per-successful-task, so genuine
     # token savings clear the noise margin at n=2 seeds.
     cost_per_task: Optional[float] = None
+    # Tasks that crashed inside the harness (termination_reason "harness_error").
+    # Any crash invalidates the run as an acceptance sample: crashed tasks do no
+    # work, so their "cost savings" are an artifact (experiment.md §20 rule 5).
+    harness_error_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -95,6 +99,15 @@ def load_guardrails(path: Union[str, Path] = DEFAULT_POLICY_PATH) -> Guardrails:
 
 def check_run(run: RunMetrics, best: Distribution, guardrails: Guardrails) -> RunCheck:
     """Decide whether one proxy run improves the objective within all guardrails."""
+    # 0. Validity: a run with harness crashes is not a usable sample at all —
+    # never accept what cannot be verified (experiment.md §20 rejection rule 5).
+    if run.harness_error_count > 0:
+        return RunCheck(
+            False,
+            f"invalid run: {run.harness_error_count} task(s) crashed in the harness "
+            "(harness_error) — the change breaks the harness",
+        )
+
     # 1. Improvement on the objective: mean cost per task strictly lower. Success is
     # a guardrail *floor* (step 2), so the objective deliberately excludes the noisy
     # pass-count denominator; cost-per-successful-task stays the reported headline.
