@@ -38,6 +38,7 @@ from iterator_agent.baseline import Distribution
 from iterator_agent.edit_guard import load_policy
 from iterator_agent.feedback import build_feedback
 from iterator_agent.hypothesis import Ticket
+from iterator_agent.preflight import PreflightResult
 from iterator_agent.run_iteration import run_iteration
 from results.logger import DEFAULT_LOGS_ROOT
 from scripts.run_iterator import run_iterator
@@ -75,7 +76,13 @@ ALLOWED_TARGET = "target_agent/prompts/system_prompt.j2"
 FORBIDDEN_TARGET = "benchmark/splits/proxy.json"
 
 # Number of _check() assertions in run_smoke_iterator — keeps the summary line honest.
-_TOTAL_CHECKS = 16
+_TOTAL_CHECKS = 19
+
+
+def _pass_preflight(_root, _target) -> PreflightResult:
+    """Injected preflight for the fake working tree (the real subprocess check
+    needs a full importable tree; its own coverage lives in tests/test_preflight.py)."""
+    return PreflightResult(True, "ok (smoke stub)")
 
 
 def _proposal_json(target: str) -> str:
@@ -226,6 +233,7 @@ def run_smoke_iterator() -> int:
             initial_version="v0.1",
             complete=editor_complete,
             eval_seed=_make_eval_seed(),
+            preflight=_pass_preflight,
             generate_backlog=_make_backlog(backlog_histories),
             commit=lambda r: committed.append(r.iteration_id),
             iterations_root=iterations_root,
@@ -307,6 +315,7 @@ def run_smoke_iterator() -> int:
             feedback=build_feedback("proxy", logs_root=logs_root),
             complete=_make_complete(FORBIDDEN_TARGET),
             eval_seed=_eval_must_not_run,  # raises if the guard lets it through
+            preflight=_pass_preflight,
             current_version="v0.2",
             iterations_root=iterations_root,
             experiments_dir=experiments_dir,
@@ -337,6 +346,7 @@ def run_smoke_iterator() -> int:
             feedback=build_feedback("proxy", logs_root=logs_root),
             complete=_make_complete("target_agent/harness.py"),
             eval_seed=_eval_no_improvement,
+            preflight=_pass_preflight,
             current_version="v0.2",
             iterations_root=iterations_root,
             experiments_dir=experiments_dir,
@@ -350,6 +360,40 @@ def run_smoke_iterator() -> int:
         failures += not _check(
             "file rolled back to its prior on-disk content",
             harness_path.read_text(encoding="utf-8") == harness_before,
+        )
+
+        # --- Scenario E: a preflight-failing edit is rejected before any eval ---
+        # (AutoPK port "validate before eval": a structurally broken candidate must
+        # never reach the paid proxy run — the eval fn raises if it does.)
+        logger.info("Scenario E: preflight failure rejects pre-eval and reverts")
+        prompts_before = (repo_root / ALLOWED_TARGET).read_text(encoding="utf-8")
+        broken = run_iteration(
+            iteration_id="iter_preflight",
+            seeds=(6001, 6002),
+            repo_root=repo_root,
+            best=INITIAL_BEST,
+            feedback=build_feedback("proxy", logs_root=logs_root),
+            complete=_make_complete(ALLOWED_TARGET),
+            eval_seed=_eval_must_not_run,  # raises if preflight lets it through
+            preflight=lambda _r, t: PreflightResult(False, f"smoke: broken candidate ({t})"),
+            current_version="v0.2",
+            iterations_root=iterations_root,
+            experiments_dir=experiments_dir,
+            logs_root=logs_root,
+        )
+        failures += not _check(
+            "preflight-failing edit rejected",
+            not broken.accepted and "preflight" in broken.decision.reason.lower(),
+            broken.decision.reason,
+        )
+        failures += not _check(
+            "no proxy seeds spent on the broken candidate",
+            len(broken.record.proxy_seeds) == 0,
+            str(broken.record.proxy_seeds),
+        )
+        failures += not _check(
+            "broken candidate reverted from the working tree",
+            (repo_root / ALLOWED_TARGET).read_text(encoding="utf-8") == prompts_before,
         )
 
     config.HARNESS_VERSION = saved_version

@@ -32,7 +32,13 @@ from iterator_agent.iteration_log import (
     IterationRecord,
 )
 from iterator_agent.researcher import CompletionFn, CostTrackingCompletion
-from iterator_agent.run_iteration import EvalSeedFn, IterationResult, run_iteration
+from iterator_agent.run_iteration import (
+    EvalSeedFn,
+    IterationResult,
+    PreflightFn,
+    proposal_hash,
+    run_iteration,
+)
 from results.logger import DEFAULT_LOGS_ROOT
 from settings import config
 
@@ -63,6 +69,7 @@ def run_iterator(
     initial_version: Optional[str] = None,
     complete: Optional[CompletionFn] = None,
     eval_seed: Optional[EvalSeedFn] = None,
+    preflight: Optional[PreflightFn] = None,
     generate_backlog: Optional[BacklogFn] = None,
     tickets_per_backlog: int = TICKETS_PER_BACKLOG,
     commit: Optional[Callable[[IterationResult], None]] = None,
@@ -95,6 +102,9 @@ def run_iterator(
     # and cleared after every accept so the next batch is drawn from the new landscape
     # (hill-climb). Off-surface / unusable batches fall back to the free-form editor.
     backlog: List[Ticket] = []
+    # Rejected-change memory (AutoPK bounce guard): content hashes of every edit
+    # rejected this run, so a re-proposed identical change is refused at $0.
+    rejected_hashes: set[str] = set()
     # Wall-clock budget (experiment.md §17.9): the primary bound when set; the
     # iteration count and search-cost caps remain as reproducible ceilings, so the
     # loop stops at whichever bound trips first.
@@ -141,6 +151,8 @@ def run_iterator(
             history=history,
             complete=complete,
             eval_seed=eval_seed,
+            preflight=preflight,
+            rejected_hashes=frozenset(rejected_hashes),
             commit=commit,
             iterations_root=iterations_root,
             experiments_dir=experiments_dir,
@@ -149,6 +161,8 @@ def run_iterator(
         )
         results.append(result)
         total_search_cost += result.search_cost_usd + backlog_cost
+        if not result.accepted:
+            rejected_hashes.add(proposal_hash(result.proposed_edit))
 
         if result.accepted:
             # Carry the objective's noise scale forward so the margin stays meaningful.

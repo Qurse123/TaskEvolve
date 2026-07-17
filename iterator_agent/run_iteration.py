@@ -20,12 +20,26 @@ the driver's job (``scripts/run_iterator.py``).
 from __future__ import annotations
 
 import difflib
+import hashlib
+import json
+import os
 import re
 import statistics
+import subprocess
+import sys
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Optional, Sequence, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    AbstractSet,
+    Callable,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 from iterator_agent.acceptance import (
     AcceptanceDecision,
@@ -46,6 +60,7 @@ from iterator_agent.iteration_log import (
     write_artifact,
     write_record,
 )
+from iterator_agent.preflight import PreflightResult, run_preflight
 from iterator_agent.researcher import (
     CompletionFn,
     CostTrackingCompletion,
@@ -61,7 +76,22 @@ if TYPE_CHECKING:
 # Per-seed eval: a seed in, that proxy run's headline metrics out.
 EvalSeedFn = Callable[[int], RunMetrics]
 
+# Candidate preflight: (repo_root, target_file) -> structural verdict at $0.
+PreflightFn = Callable[[Path, str], PreflightResult]
+
 _VERSION_RE = re.compile(r"^v(\d+)\.(\d+)$")
+
+
+def proposal_hash(proposal: ProposedEdit) -> str:
+    """Content identity of an edit: what file it touches and what it writes there.
+
+    Prose fields (summary/reason) are excluded — a re-worded pitch for the same
+    bytes is still the same change (AutoPK's rejected-ticket memory)."""
+    digest = hashlib.sha256()
+    digest.update(proposal.target_file.encode("utf-8"))
+    digest.update(b"\x00")
+    digest.update(proposal.new_content.encode("utf-8"))
+    return digest.hexdigest()
 
 
 @dataclass(frozen=True)
@@ -98,8 +128,10 @@ def run_iteration(
     logs_root: Union[str, Path] = DEFAULT_LOGS_ROOT,
     commit: Optional[Callable[[IterationResult], None]] = None,
     ticket: Optional["Ticket"] = None,
+    preflight: Optional[PreflightFn] = None,
+    rejected_hashes: Optional[AbstractSet[str]] = None,
 ) -> IterationResult:
-    """Run one propose -> guard -> proxy x2 -> accept/revert cycle (experiment.md §21).
+    """Run one propose -> guard -> preflight -> proxy x2 -> accept/revert cycle (experiment.md §21).
 
     Args:
         iteration_id: Stable id for this iteration (the driver assigns it).
@@ -111,6 +143,10 @@ def run_iteration(
         eval_seed: Injected per-seed eval (default: one proxy repeat via run_train_eval).
         current_version: Current-best harness version (default: ``config.HARNESS_VERSION``).
         commit: Optional hook called with the result on accept (e.g. a git commit).
+        preflight: Injected structural check run after the edit is applied but
+            before any eval spend (default: the real subprocess preflight).
+        rejected_hashes: Content hashes (``proposal_hash``) of previously rejected
+            edits; a duplicate proposal is refused at $0 (AutoPK bounce guard).
     """
     repo_root = Path(repo_root)
     policy = policy if policy is not None else load_policy()
@@ -149,10 +185,8 @@ def run_iteration(
     # attributes only this iteration's editor cost.
     search_cost = float(getattr(editor_complete, "total_cost_usd", 0.0)) - cost_before
 
-    # 4-5. Allowed Change Check — a forbidden target is rejected before any eval.
-    guard = evaluate(proposal.target_file, policy)
-    if not guard.allowed:
-        decision = AcceptanceDecision(False, f"rejected: {guard.reason}", ())
+    def _reject_before_eval(reason: str, original: Optional[str]) -> IterationResult:
+        decision = AcceptanceDecision(False, reason, ())
         return _persist(
             iteration_id=iteration_id,
             accepted=False,
@@ -163,7 +197,7 @@ def run_iteration(
             best=best,
             harness_version=current_version,
             search_cost=search_cost,
-            original=None,
+            original=original,
             editor_model=editor_model,
             agent_model=agent_model,
             iterations_root=iterations_root,
@@ -172,9 +206,35 @@ def run_iteration(
             ticket=ticket,
         )
 
+    # 4-5. Allowed Change Check — a forbidden target is rejected before any eval.
+    guard = evaluate(proposal.target_file, policy)
+    if not guard.allowed:
+        return _reject_before_eval(f"rejected: {guard.reason}", original=None)
+
+    # 5b. Rejected-change memory (AutoPK bounce guard): an edit content-identical
+    # to one already rejected this run is refused without applying or evaluating.
+    if rejected_hashes and proposal_hash(proposal) in rejected_hashes:
+        return _reject_before_eval(
+            "rejected: duplicate of a previously rejected change "
+            f"(same content for {proposal.target_file})",
+            original=None,
+        )
+
     # 6. Apply the change; tag candidate evals with the bumped version.
     candidate_version = _bump_version(current_version)
     original = _apply_edit(repo_root, proposal.target_file, proposal.new_content)
+
+    # 6b. Preflight (AutoPK "validate before eval"): exercise the edited tree in
+    # a fresh interpreter at $0; a structurally broken candidate never reaches
+    # the paid proxy eval (experiment.md §20 rule 5, §21 step 5).
+    preflight_fn = preflight if preflight is not None else run_preflight
+    verdict = preflight_fn(repo_root, proposal.target_file)
+    if not verdict.passed:
+        _revert_edit(repo_root, proposal.target_file, original)
+        return _reject_before_eval(
+            f"rejected: preflight failed — {verdict.reason}", original=original
+        )
+
     eval_fn = eval_seed if eval_seed is not None else _default_eval_seed(split)
     config.HARNESS_VERSION = candidate_version
 
@@ -363,15 +423,41 @@ def _bump_version(version: str) -> str:
 
 
 def _default_eval_seed(split: str) -> EvalSeedFn:
-    """Default eval: one proxy repeat at the seed via the M1 runner (writes results.csv)."""
-    from scripts.run_train_eval import run_repeats
+    """Default eval: one proxy repeat at the seed, in a FRESH interpreter.
+
+    The candidate edit may touch Python surfaces (``harness.py``,
+    ``model_routing.py``); an in-process eval would silently run the stale,
+    already-imported modules instead of the candidate (AutoPK's one-shot
+    dispatcher runs every hop as its own process for the same reason). The
+    subprocess imports the edited tree fresh and carries the candidate
+    ``HARNESS_VERSION`` via the environment so its ``results.csv`` rows
+    attribute to the candidate. Metrics come back through ``--metrics-json``.
+    """
 
     def eval_fn(seed: int) -> RunMetrics:
-        metrics = run_repeats(split, seed_start=seed, repeats=1)[0]
+        with tempfile.TemporaryDirectory() as tmp:
+            metrics_path = Path(tmp) / "metrics.json"
+            proc = subprocess.run(
+                [
+                    sys.executable, "-m", "scripts.run_train_eval",
+                    "--split", split,
+                    "--seed-start", str(seed),
+                    "--repeats", "1",
+                    "--metrics-json", str(metrics_path),
+                ],
+                env={**os.environ, "HARNESS_VERSION": config.HARNESS_VERSION},
+            )
+            if proc.returncode != 0 or not metrics_path.exists():
+                raise RuntimeError(
+                    f"proxy eval subprocess failed (exit {proc.returncode}) "
+                    f"for split={split} seed={seed}"
+                )
+            row = json.loads(metrics_path.read_text(encoding="utf-8"))[0]
         return RunMetrics(
-            pass_rate=metrics.pass_rate,
-            cost_per_successful_task=metrics.cost_per_successful_task,
-            cost_per_task=metrics.cost_per_task,
+            pass_rate=float(row["pass_rate"]),
+            cost_per_successful_task=row["cost_per_successful_task"],
+            cost_per_task=row["cost_per_task"],
+            harness_error_count=int(row.get("harness_error_count", 0)),
         )
 
     return eval_fn
