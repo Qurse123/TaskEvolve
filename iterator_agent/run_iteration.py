@@ -42,12 +42,14 @@ from typing import (
 )
 
 from iterator_agent.acceptance import (
+    MAX_PROXY_RUNS,
     AcceptanceDecision,
     Guardrails,
     RunMetrics,
     check_run,
     evaluate_candidate,
     load_guardrails,
+    near_miss,
 )
 from iterator_agent.baseline import Distribution, load_distribution
 from iterator_agent.edit_guard import EditPolicy, evaluate, load_policy
@@ -112,7 +114,7 @@ class IterationResult:
 def run_iteration(
     *,
     iteration_id: str,
-    seeds: Tuple[int, int],
+    seeds: Tuple[int, ...],
     split: str = "proxy",
     repo_root: Union[str, Path] = ".",
     policy: Optional[EditPolicy] = None,
@@ -269,12 +271,13 @@ def run_iteration(
 
 
 def _run_double(
-    seeds: Tuple[int, int],
+    seeds: Tuple[int, ...],
     eval_fn: EvalSeedFn,
     best: Distribution,
     guardrails: Guardrails,
 ) -> Tuple[Tuple[RunMetrics, ...], Tuple[int, ...], AcceptanceDecision]:
-    """Run seed A, then seed B only if A improves; return runs, seeds, and the verdict."""
+    """Run seed A, then seed B only if A improves; on a seed-B near-miss, spend up
+    to two extra seeds and apply the mean rule (§20 M3 amendment)."""
     run_a = eval_fn(seeds[0])
     check_a = check_run(run_a, best, guardrails)
     if not check_a.passed:
@@ -287,9 +290,23 @@ def _run_double(
         return (run_a,), (seeds[0],), decision
 
     run_b = eval_fn(seeds[1])
-    runs = (run_a, run_b)
-    decision = evaluate_candidate(runs, best, guardrails)
-    return runs, (seeds[0], seeds[1]), decision
+    runs = [run_a, run_b]
+    used = [seeds[0], seeds[1]]
+    decision = evaluate_candidate(tuple(runs), best, guardrails)
+
+    # Near-miss extension: seed B cleared every guardrail and beat the best MEAN
+    # but missed the noise margin — buy statistical power instead of discarding a
+    # likely-real improvement. Stop at the first extension run that regresses.
+    if not decision.accepted and near_miss(run_b, best, guardrails):
+        for seed in seeds[2:MAX_PROXY_RUNS]:
+            run = eval_fn(seed)
+            runs.append(run)
+            used.append(seed)
+            if not near_miss(run, best, guardrails):
+                break
+        decision = evaluate_candidate(tuple(runs), best, guardrails)
+
+    return tuple(runs), tuple(used), decision
 
 
 def _persist(

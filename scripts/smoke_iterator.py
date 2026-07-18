@@ -60,15 +60,16 @@ INITIAL_BEST = Distribution(
     cost_per_task_std=0.01,
 )
 
-# Per-seed fake metrics. Iteration 1 (seeds 9001/9002) beats the $0.10 baseline at
-# the same success -> accept. Iteration 2 (seeds 9003/9004) cannot beat the promoted
-# $0.08 best -> reject on the first run (seed B short-circuited).
+# Per-seed fake metrics. Each iteration reserves a 4-seed block. Iteration 1
+# (block 9001..9004) beats the $0.10 baseline at the same success on its first two
+# seeds -> accept. Iteration 2 (block 9005..9008) cannot beat the promoted $0.08
+# best -> reject on the first run (seed B short-circuited).
 SEED_START = 9001
 SEED_METRICS: Dict[int, Tuple[float, float]] = {
     9001: (0.6, 0.08),
     9002: (0.6, 0.08),
-    9003: (0.6, 0.085),
-    9004: (0.6, 0.085),
+    9005: (0.6, 0.085),
+    9006: (0.6, 0.085),
 }
 
 # A valid in-surface edit target and a frozen one, for the accept and forbidden cases.

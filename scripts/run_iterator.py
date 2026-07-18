@@ -21,7 +21,7 @@ import time
 from pathlib import Path
 from typing import Callable, List, Optional, Sequence, Tuple, Union
 
-from iterator_agent.acceptance import Guardrails
+from iterator_agent.acceptance import MAX_PROXY_RUNS, Guardrails
 from iterator_agent.baseline import Distribution, load_distribution
 from iterator_agent.edit_guard import EditPolicy
 from iterator_agent.feedback import build_feedback
@@ -50,8 +50,10 @@ BacklogFn = Callable[
 
 logger = logging.getLogger(__name__)
 
-# Two logged proxy seeds per iteration (the double-run rule).
-SEEDS_PER_ITERATION = 2
+# Seeds reserved per iteration: the double-run pair plus up to two near-miss
+# extension seeds (§20 M3 amendment). Unused seeds are simply skipped, keeping
+# every iteration's seed block disjoint and reproducible.
+SEEDS_PER_ITERATION = MAX_PROXY_RUNS
 
 
 def run_iterator(
@@ -141,7 +143,7 @@ def run_iterator(
 
         result = run_iteration(
             iteration_id=f"iter_{index + 1:04d}",
-            seeds=(seed_a, seed_a + 1),
+            seeds=tuple(seed_a + j for j in range(SEEDS_PER_ITERATION)),
             split=split,
             repo_root=repo_root,
             policy=policy,
@@ -265,7 +267,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     parser.add_argument(
         "--seed-start", type=int, required=True,
-        help="First proxy seed; iteration i uses seeds seed_start+2i and +1.",
+        help="First proxy seed; iteration i reserves the block seed_start+4i..+3 "
+        "(double-run pair + up to two near-miss extension seeds).",
     )
     parser.add_argument(
         "--max-search-cost-usd", type=float, default=None,
