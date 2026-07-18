@@ -197,11 +197,12 @@ def test_stops_at_max_iterations(tmp_path: Path) -> None:
     # Act
     results = _run_iterator(tmp_path, complete=_varying_complete(), eval_fn=eval_fn, max_iterations=3)
 
-    # Assert: 3 iterations, all rejected; version never bumped; seed B skipped each time.
+    # Assert: 3 iterations, all rejected; version never bumped; seed B skipped each
+    # time. Each iteration reserves a 4-seed block (double-run + near-miss extension).
     assert len(results) == 3
     assert all(not r.accepted for r in results)
     assert results[-1].harness_version == "v0.1"
-    assert seen == [1001, 1003, 1005]
+    assert seen == [1001, 1005, 1009]
 
 
 def test_accept_updates_current_best_for_next_iteration(tmp_path: Path) -> None:
@@ -217,7 +218,7 @@ def test_accept_updates_current_best_for_next_iteration(tmp_path: Path) -> None:
     assert results[1].harness_version == "v0.3"
     # Iteration 2 was compared against iteration 1's accepted distribution, not Arm A.
     assert results[1].record.cost_per_successful_task_before == pytest.approx(0.07)
-    assert seen == [1001, 1002, 1003, 1004]
+    assert seen == [1001, 1002, 1005, 1006]
 
 
 def test_reject_keeps_previous_best(tmp_path: Path) -> None:
