@@ -180,3 +180,66 @@ def test_run_without_harness_errors_unaffected_by_new_field():
     check = check_run(run, BEST, GUARDRAILS)
 
     assert check.passed is True
+
+
+# --- Near-miss seed extension (§20 M3 amendment) --------------------------------
+# When a run clears every guardrail and beats the current-best MEAN but misses the
+# noise margin, the orchestrator may spend extra seeds; with n >= 3 runs the accept
+# test becomes: every run below the best mean, all guardrails clear, and the MEAN
+# cost across runs below the same mu - k*sigma threshold. Same bar, more power.
+
+MARGIN_GUARDRAILS = Guardrails(
+    task_success_floor_frac_of_best=0.95,
+    max_cost_per_successful_task_usd=None,
+    max_invalid_action_rate=None,
+    accept_margin_sigma=1.0,  # threshold = 0.09 - 0.01 = 0.08
+)
+
+
+def _run_at(cost: float, pass_rate: float = 0.60) -> RunMetrics:
+    return RunMetrics(
+        pass_rate=pass_rate, cost_per_successful_task=cost, cost_per_task=cost
+    )
+
+
+def test_near_miss_is_true_between_threshold_and_mean():
+    from iterator_agent.acceptance import near_miss
+
+    assert near_miss(_run_at(0.085), BEST, MARGIN_GUARDRAILS) is True   # < mean, >= threshold
+    assert near_miss(_run_at(0.075), BEST, MARGIN_GUARDRAILS) is True   # beats threshold too
+    assert near_miss(_run_at(0.095), BEST, MARGIN_GUARDRAILS) is False  # above best mean
+    assert near_miss(_run_at(0.085, pass_rate=0.40), BEST, MARGIN_GUARDRAILS) is False  # floor
+
+
+def test_three_run_mean_below_threshold_accepts():
+    runs = [_run_at(0.078), _run_at(0.085), _run_at(0.074)]  # mean 0.079 < 0.08
+
+    decision = evaluate_candidate(runs, BEST, MARGIN_GUARDRAILS)
+
+    assert decision.accepted is True
+    assert "mean" in decision.reason.lower()
+
+
+def test_three_run_mean_at_threshold_rejects():
+    runs = [_run_at(0.078), _run_at(0.085), _run_at(0.077)]  # mean 0.080 == threshold
+
+    decision = evaluate_candidate(runs, BEST, MARGIN_GUARDRAILS)
+
+    assert decision.accepted is False
+
+
+def test_extension_run_at_best_mean_rejects_even_if_mean_clears():
+    runs = [_run_at(0.060), _run_at(0.060), _run_at(0.090)]  # 0.090 == best mean
+
+    decision = evaluate_candidate(runs, BEST, MARGIN_GUARDRAILS)
+
+    assert decision.accepted is False
+
+
+def test_two_run_path_still_requires_both_to_beat_margin():
+    # Near-miss on seed B with only 2 runs must NOT accept (mean rule needs n>=3).
+    runs = [_run_at(0.078), _run_at(0.085)]  # mean 0.0815 would beat 0.09... but n=2
+
+    decision = evaluate_candidate(runs, BEST, MARGIN_GUARDRAILS)
+
+    assert decision.accepted is False
