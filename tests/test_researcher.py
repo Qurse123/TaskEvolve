@@ -258,3 +258,24 @@ def test_cost_tracking_completion_treats_missing_cost_as_zero():
 
     assert complete("p") == "text"
     assert complete.total_cost_usd == 0.0
+
+
+def test_litellm_raw_drops_unsupported_params(monkeypatch):
+    # The editor model is configurable (e.g. o3, which rejects `temperature`);
+    # drop_params lets LiteLLM strip whatever the chosen model does not support.
+    from iterator_agent import researcher as r
+    from settings import config
+
+    captured = {}
+
+    def fake_completion(**kwargs):
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(r.litellm, "completion", fake_completion)
+    monkeypatch.setattr(config, "ITERATOR_MODEL", "o3")
+
+    r._litellm_raw("hello")
+
+    assert captured["model"] == "o3"
+    assert captured["drop_params"] is True

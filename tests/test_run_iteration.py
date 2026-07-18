@@ -113,10 +113,10 @@ def _pass_preflight(_root, _target):
 def _run(tmp_path: Path, *, complete, eval_fn, **overrides):
     return run_iteration(
         iteration_id=overrides.pop("iteration_id", "iter_0001"),
-        seeds=(1001, 1002),
+        seeds=overrides.pop("seeds", (1001, 1002)),
         repo_root=_repo(tmp_path),
         policy=load_policy(),
-        guardrails=_guardrails(),
+        guardrails=overrides.pop("guardrails", _guardrails()),
         best=_best(),
         feedback=_feedback(),
         complete=complete,
@@ -512,3 +512,78 @@ def test_default_eval_seed_raises_on_subprocess_failure(monkeypatch) -> None:
 
     with pytest.raises(RuntimeError, match="exit 3"):
         ri._default_eval_seed("proxy")(3101)
+
+
+# --- Near-miss seed extension (§20 M3 amendment) ---------------------------------
+
+def _margin_guardrails() -> Guardrails:
+    # best cost mean 0.083, std 0.016 -> threshold 0.067; near-miss band [0.067, 0.083)
+    return Guardrails(
+        task_success_floor_frac_of_best=0.95,
+        max_cost_per_successful_task_usd=None,
+        max_invalid_action_rate=None,
+        accept_margin_sigma=1.0,
+    )
+
+
+def test_near_miss_seed_b_extends_to_four_runs_and_accepts(tmp_path: Path) -> None:
+    eval_fn, calls = _eval_counter(
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.060, cost_per_task=0.060),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.070, cost_per_task=0.070),  # near miss
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.060, cost_per_task=0.060),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.060, cost_per_task=0.060),
+    )
+
+    result = _run(
+        tmp_path,
+        complete=_fake_complete(_proposal_json()),
+        eval_fn=eval_fn,
+        seeds=(1001, 1002, 1003, 1004),
+        guardrails=_margin_guardrails(),
+    )
+
+    # mean over 4 runs = 0.0625 < threshold 0.067 -> accepted via the extension.
+    assert result.accepted is True
+    assert calls["n"] == 4
+    assert result.record.proxy_seeds == (1001, 1002, 1003, 1004)
+    assert "near-miss" in result.decision.reason.lower()
+
+
+def test_extension_stops_early_when_a_run_regresses(tmp_path: Path) -> None:
+    eval_fn, calls = _eval_counter(
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.060, cost_per_task=0.060),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.070, cost_per_task=0.070),  # near miss
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.090, cost_per_task=0.090),  # >= best mean
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.060, cost_per_task=0.060),
+    )
+
+    result = _run(
+        tmp_path,
+        complete=_fake_complete(_proposal_json()),
+        eval_fn=eval_fn,
+        seeds=(1001, 1002, 1003, 1004),
+        guardrails=_margin_guardrails(),
+    )
+
+    assert result.accepted is False
+    assert calls["n"] == 3  # seed D never runs after C regressed
+    assert (tmp_path / ALLOWED_TARGET).read_text() == ORIGINAL_CONTENT  # reverted
+
+
+def test_no_extension_when_seed_b_fails_outright(tmp_path: Path) -> None:
+    eval_fn, calls = _eval_counter(
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.060, cost_per_task=0.060),
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.100, cost_per_task=0.100),  # above mean
+        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.060, cost_per_task=0.060),
+    )
+
+    result = _run(
+        tmp_path,
+        complete=_fake_complete(_proposal_json()),
+        eval_fn=eval_fn,
+        seeds=(1001, 1002, 1003, 1004),
+        guardrails=_margin_guardrails(),
+    )
+
+    assert result.accepted is False
+    assert calls["n"] == 2  # no seeds spent extending a hard failure
