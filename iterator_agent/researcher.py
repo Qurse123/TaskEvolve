@@ -133,6 +133,9 @@ def _litellm_raw(prompt: str) -> Any:
         model=model,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.0,
+        # The editor model is swappable via .env; reasoning models (o-series)
+        # reject temperature — drop_params strips what the model can't take.
+        drop_params=True,
     )
 
 
