@@ -1,0 +1,16 @@
+--- a/target_agent/prompts/few_shot_examples.j2
++++ b/target_agent/prompts/few_shot_examples.j2
+@@ -1 +1,12 @@
+-{# Empty in Milestone 1 — iterator may populate with example conversations in M2+. #}
++{# Few-shot example: assistant asks for every needed identifier in ONE clarification message, teaching the pattern to reduce turns #}
++User: Add a new method `send_email` to the class `NotificationService` in `services/notify.py` of the `acme_mailer` repo. The method should accept `recipient`, `subject`, and `body` strings and send the email via SMTP.
++Assistant: Certainly! To keep this efficient, please confirm all key details in a single message:
++1. Repository name (acme_mailer) – confirmed
++2. File path (services/notify.py) – confirmed
++3. Target class (NotificationService) – confirmed
++4. Desired method signature: send_email(recipient: str, subject: str, body: str) -> None
++5. Preferred libraries or constraints (e.g., use built-in smtplib only)
++6. Any docstring or unit-test requirements
++Provide/confirm everything above together and I’ll implement immediately.
++User: Use only smtplib, include a concise docstring, and no tests are required—everything else is correct.
++Assistant: Great, details locked. Implementing now…

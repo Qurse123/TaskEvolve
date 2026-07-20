@@ -1,0 +1,77 @@
+--- a/target_agent/harness.py
++++ b/target_agent/harness.py
+@@ -7,10 +7,18 @@
+ 
+ from __future__ import annotations
+ 
+-from typing import Sequence
++from typing import Sequence, List
+ 
+ from tau2.data_model.message import Message, SystemMessage
+ from tau2.environment.tool import Tool
++
++# ----------------------------------------------------------------------------------
++# Internal state: we store the most-recent messages so `filter_tools` can reference
++# conversation context without changing its public signature (the framework expects
++# exactly `filter_tools(tools)`).
++# ----------------------------------------------------------------------------------
++_RECENT_MESSAGES: list[Message] | None = None
++_RECENT_WINDOW = 4  # how many trailing messages to inspect for tool mentions
+ 
+ 
+ def build_messages(
+@@ -19,16 +27,47 @@
+ ) -> list[Message]:
+     """Return the full message list to pass to generate().
+ 
+-    M1: pass-through — system + history with no compression. This is the frozen
+-    Arm A baseline; the iterator may add sliding-window or summary compression here.
++    Arm A baseline +: we still return the raw list but also cache the last few
++    messages so `filter_tools` can expose only the tools that are relevant to
++    the immediate conversational context (hypothesis t2).
+     """
+-    return [*system_messages, *history]
++    global _RECENT_MESSAGES
++    full = [*system_messages, *history]
++    # Cache only the tail of the conversation to keep memory small.
++    _RECENT_MESSAGES = full[-_RECENT_WINDOW:]
++    return full
++
++
++def _mentioned_tools(tools: List[Tool]) -> set[str]:
++    """Return the lower-cased names of tools that are mentioned in recent msgs."""
++    if not _RECENT_MESSAGES:
++        return set()
++
++    combined_text = "\n".join(
++        (
++            (getattr(m, "name", "") or "") + " " + (m.content or "")
++            if hasattr(m, "content")
++            else (getattr(m, "name", "") or "")
++        )
++        for m in _RECENT_MESSAGES
++    ).lower()
++
++    return {t.name for t in tools if t.name.lower() in combined_text}
+ 
+ 
+ def filter_tools(tools: list[Tool]) -> list[Tool]:
+-    """Return the tool list to expose to the LLM.
++    """Expose only tools referenced in the recent conversation (hypothesis t2).
+ 
+-    M1: pass-through — all tools exposed unchanged.
+-    Iterator can narrow the set or rewrite descriptions here.
++    When none of the available tools are mentioned in the last few messages we
++    fall back to returning the full catalogue, preventing accidental
++    capability loss early in the dialogue.
+     """
+-    return list(tools)
++    # Defensive: if history unavailable, do no filtering.
++    if not tools:
++        return []
++
++    mentioned = _mentioned_tools(tools)
++    if not mentioned:
++        return list(tools)  # fallback – don't risk hiding everything
++
++    return [t for t in tools if t.name in mentioned]
