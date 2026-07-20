@@ -1,0 +1,73 @@
+--- a/target_agent/model_routing.py
++++ b/target_agent/model_routing.py
+@@ -1,20 +1,61 @@
+ """Model selection for TaskEvolveAgent.
+ 
+-The iterator (Milestone 2+) may modify this file to add:
+-- Cheap/strong routing based on turn count or confidence
+-- Per-task-type model selection
++Routing logic:
++1. The very first assistant turn (no history yet) is sent to the cheap model –
++   this already existed.
++2. We additionally detect the common tool-call pattern `tool → assistant → user`.
++   When the conversation ends with that sequence, the upcoming assistant turn
++   is almost always a *pure* JSON tool call.  Those mechanical calls can be
++   safely handled by the cheaper `gpt-4.1-mini` while all reasoning-heavy
++   turns (including the assistant response to the tool output) stay on the
++   stronger `gpt-4.1` model.
++
++Only the allowed model names are used.
+ """
+ 
+ from __future__ import annotations
++from typing import List, Dict, Any
++
++Message = Dict[str, Any]
+ 
+ 
+-def get_model(configured_model: str, history=None) -> str:
+-    """Return the model to use for the current generation call.
++def _looks_like_upcoming_tool_call(history: List[Message]) -> bool:
++    """Heuristic: conversation ends with TOOL → ASSISTANT → USER.
+ 
+-    Routes to gpt-4.1-mini if there is no conversation history (i.e., first turn),
+-    otherwise uses the configured model. This sends simple, tool-free, single-turn tasks
+-    to the cheaper model by default.
++    Pattern: *tool executes*  ➜  assistant interprets tool output  ➜  user
++    asks for the next step.  The assistant's *next* turn is very likely to be
++    another bare JSON tool invocation.
+     """
+-    if history is not None and len(history) == 0:
++    if len(history) < 3:
++        return False
++
++    last, prev, prior = history[-1], history[-2], history[-3]
++
++    return (
++        last.get("role") == "user"
++        and prev.get("role") == "assistant"
++        and prior.get("role") == "tool"
++    )
++
++
++def get_model(configured_model: str, history: List[Message] | None = None) -> str:
++    """Return the model name for the current generation call.
++
++    - First turn (no history) ➜ gpt-4.1-mini
++    - If heuristic predicts a pure tool call (`tool → assistant → user`) ➜ gpt-4.1-mini
++    - Otherwise use the configured (strong) model.
++    """
++    # No special routing if history is missing.
++    if history is None:
++        return configured_model
++
++    # First assistant turn of the task.
++    if len(history) == 0:
+         return "gpt-4.1-mini"
++
++    # Pure-action step heuristic.
++    if _looks_like_upcoming_tool_call(history):
++        return "gpt-4.1-mini"
++
++    # Default: strong model for reasoning turns.
+     return configured_model

@@ -1,0 +1,88 @@
+--- a/target_agent/model_routing.py
++++ b/target_agent/model_routing.py
+@@ -1,20 +1,75 @@
+ """Model selection for TaskEvolveAgent.
+ 
+-The iterator (Milestone 2+) may modify this file to add:
+-- Cheap/strong routing based on turn count or confidence
+-- Per-task-type model selection
++This router tries to use the cheaper ``gpt-4.1-mini`` for the many
++mechanical mid-/late-conversation turns (status updates, tool dispatches,
++short acknowledgements) while keeping the stronger ``gpt-4.1`` for the few
++turns that really need heavy reasoning.
++
++Heuristic:
++1. First turn  → mini (unchanged).
++2. If the running conversation already exceeds ~300 tokens of content
++   (≈1200 characters) we stick with the configured model because future
++   reasoning is likely complex.
++3. Otherwise, look at the last assistant message:
++      • If it was a tool call *or* its textual content is very short
++        (<50 chars), we treat the next user turn as a lightweight follow-up
++        and route to the mini model.
++4. Fallback → configured model.
++
++This simple rule shifts many follow-up exchanges to the 5× cheaper model while
++still engaging the full model when useful, reducing mean cost without harming
++success.
+ """
+ 
+ from __future__ import annotations
++from typing import List, Dict, Any
+ 
+ 
+-def get_model(configured_model: str, history=None) -> str:
+-    """Return the model to use for the current generation call.
++def _approx_token_count(history: List[Dict[str, Any]]) -> int:
++    """Rough token estimate (≈4 chars / token)."""
++    total_chars = 0
++    for msg in history:
++        total_chars += len((msg.get("content") or ""))
++    return total_chars // 4  # integer division suffices for routing
+ 
+-    Routes to gpt-4.1-mini if there is no conversation history (i.e., first turn),
+-    otherwise uses the configured model. This sends simple, tool-free, single-turn tasks
+-    to the cheaper model by default.
+-    """
+-    if history is not None and len(history) == 0:
++
++def _needs_mini(history: List[Dict[str, Any]]) -> bool:
++    """Return True if the next turn looks lightweight (tool/ack)."""
++    if not history:
++        return True  # first turn handled earlier but keep safe
++
++    # Heavy context? stay with full model.
++    if _approx_token_count(history) > 300:
++        return False
++
++    # Find last assistant message
++    last_assistant = next(
++        (m for m in reversed(history) if m.get("role") == "assistant"), None
++    )
++    if not last_assistant:
++        return False  # no assistant yet → probably first reasoning step
++
++    # If assistant just issued a tool call, next step is usually lightweight.
++    if (
++        last_assistant.get("tool_calls")
++        or last_assistant.get("tool_call_id")
++        or (last_assistant.get("content") or "").strip().upper().startswith("CALL_")
++    ):
++        return True
++
++    # Very short assistant utterances are often simple acknowledgements.
++    if len((last_assistant.get("content") or "").strip()) < 50:
++        return True
++
++    return False
++
++
++def get_model(configured_model: str, history: List[dict] | None = None) -> str:
++    """Select ``gpt-4.1`` vs ``gpt-4.1-mini`` based on the above heuristic."""
++    if history is None or len(history) == 0:
++        return "gpt-4.1-mini"  # cheap for very first turn
++
++    if _needs_mini(history):
+         return "gpt-4.1-mini"
++
+     return configured_model

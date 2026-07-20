@@ -1,0 +1,63 @@
+--- a/target_agent/harness.py
++++ b/target_agent/harness.py
+@@ -12,17 +12,56 @@
+ from tau2.data_model.message import Message, SystemMessage
+ from tau2.environment.tool import Tool
+ 
++# Sliding-window parameters
++_WINDOW_SIZE: int = 12           # keep this many most-recent dialogue turns verbatim
++_MAX_SUMMARY_LINES: int = 20     # cap on how many bullet lines go into the summary
++_MAX_CONTENT_CHARS: int = 60     # truncate each bullet to this length
++
++
++def _summarise(messages: Sequence[Message]) -> SystemMessage:
++    """Create a lightweight textual digest of the earlier dialogue.
++
++    We avoid an extra model call by using a rule-based summary: each omitted
++    message contributes one bullet listing its role and a truncated version of
++    its content. The summary is strictly shorter than keeping the raw messages
++    and still reminds the model of high-level context.
++    """
++    summary_lines: list[str] = []
++    for msg in messages[:_MAX_SUMMARY_LINES]:
++        # Defensive: guard against absent or non-string content
++        content = (getattr(msg, "content", "") or "").strip()
++        if len(content) > _MAX_CONTENT_CHARS:
++            content = content[: _MAX_CONTENT_CHARS - 3] + "..."
++        summary_lines.append(f"{msg.role}: {content}")
++    if len(messages) > _MAX_SUMMARY_LINES:
++        summary_lines.append("… (further turns omitted) …")
++
++    summary_text = (
++        "Summary of earlier dialogue (compressed for brevity):\n" + "\n".join(summary_lines)
++    )
++    return SystemMessage(content=summary_text)
++
+ 
+ def build_messages(
+     system_messages: list[SystemMessage],
+     history: Sequence[Message],
+ ) -> list[Message]:
+-    """Return the full message list to pass to generate().
++    """Return the message list to pass to generate().
+ 
+-    M1: pass-through — system + history with no compression. This is the frozen
+-    Arm A baseline; the iterator may add sliding-window or summary compression here.
++    Implements ticket t3: keep only the most-recent _WINDOW_SIZE messages plus
++    a short textual digest of everything that came before. This prevents prompt
++    growth on long tasks while preserving immediate context and a lightweight
++    memory of earlier interactions.
+     """
+-    return [*system_messages, *history]
++
++    # Nothing to compress if the dialogue is short.
++    if len(history) <= _WINDOW_SIZE:
++        return [*system_messages, *history]
++
++    # Split into earlier (to be summarised) and recent (kept verbatim).
++    earlier, recent = history[:-_WINDOW_SIZE], history[-_WINDOW_SIZE:]
++    summary_msg = _summarise(earlier)
++    return [*system_messages, summary_msg, *recent]
+ 
+ 
+ def filter_tools(tools: list[Tool]) -> list[Tool]:

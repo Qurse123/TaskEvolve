@@ -8,7 +8,7 @@ Full design: `systems_design.md` | Research spec: `experiment.md`
 
 ---
 
-## Current Status: Milestone 2 — Arm B (iterator agent). Milestone 1 ✅ COMPLETE.
+## Current Status: Milestone 2 ✅ COMPLETE — Arm B verdict: **proxy-overfit** (see blind-validation entry below; the −18% proxy cost gain transferred to validation but cost 8.6pp of success). Milestone 1 ✅ COMPLETE. Next: M3 (open-weight arms C/D per `experiment.md §14.2`) — not started. The optional TAU2 test-split run was **deferred**: `scripts/run_tau_test.py` is unbuilt, and with Arm B proxy-overfit the single test-split shot is better spent on a validated M3 candidate.
 
 **Standing workflow (applies to every milestone):** when starting a new task in a build sequence, read `/Users/mihirsawhney/Projects/TaskEvolve/systems_design.md` and `/Users/mihirsawhney/Projects/TaskEvolve/experiment.md` first to confirm what you build is compliant with those documents. Use subagent-driven development. After completing each sequence, stop so I can review / give feedback before the next.
 

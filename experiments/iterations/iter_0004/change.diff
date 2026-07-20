@@ -1,0 +1,21 @@
+--- a/target_agent/harness.py
++++ b/target_agent/harness.py
+@@ -19,10 +19,15 @@
+ ) -> list[Message]:
+     """Return the full message list to pass to generate().
+ 
+-    M1: pass-through — system + history with no compression. This is the frozen
+-    Arm A baseline; the iterator may add sliding-window or summary compression here.
++    M2 tweak (ticket t4): only include the verbose system messages on the very
++    first generation call. After the first turn, the model already has those
++    instructions in context, so re-sending them wastes tokens.
+     """
+-    return [*system_messages, *history]
++    # If this is the first turn (no prior user/assistant messages), include
++    # the system prompts; otherwise omit them to save tokens.
++    if len(history) == 0:
++        return [*system_messages]
++    return list(history)
+ 
+ 
+ def filter_tools(tools: list[Tool]) -> list[Tool]:
