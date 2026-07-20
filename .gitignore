@@ -12,3 +12,6 @@ experiments/logs/
 experiments/plots/
 experiments/results.csv
 experiments/*.db
+
+# Bulky per-run console logs (regenerable; verdicts live in experiments/iterations + results.csv)
+experiments/*.log
