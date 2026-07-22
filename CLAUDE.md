@@ -8,7 +8,15 @@ Full design: `systems_design.md` | Research spec: `experiment.md`
 
 ---
 
-## Current Status: Milestone 2 ✅ COMPLETE — Arm B verdict: **proxy-overfit** (see blind-validation entry below; the −18% proxy cost gain transferred to validation but cost 8.6pp of success). Milestone 1 ✅ COMPLETE. Next: M3 (open-weight arms C/D per `experiment.md §14.2`) — not started. The optional TAU2 test-split run was **deferred**: `scripts/run_tau_test.py` is unbuilt, and with Arm B proxy-overfit the single test-split shot is better spent on a validated M3 candidate.
+## Current Status: M3 **Arm C ✅ COMPLETE — clean Pareto win** (naive open-weight Inkling beats the closed gpt-4.1 baseline on both axes; details below). Milestone 2 ✅ COMPLETE — Arm B verdict: **proxy-overfit** (see blind-validation entry below; the −18% proxy cost gain transferred to validation but cost 8.6pp of success). Milestone 1 ✅ COMPLETE. Next: M3 **Arm D** (fine-tune Inkling on successful proxy traces via Tinker, same static v0.1 harness). The optional TAU2 test-split run stays **deferred** until a fully validated final candidate exists.
+
+### M3 Arm C — Naive Inkling (open-weight) baseline ✅ COMPLETE (2026-07-22)
+Model: **Inkling** (Thinking Machines, 975B/41B MoE), served via **Together AI's OpenAI-compatible endpoint** (`AGENT_MODEL=openai/thinkingmachines/Inkling`, `AGENT_API_BASE=https://api.together.xyz/v1`, key from `TOGETHER_API_KEY`). Static **Arm A v0.1 harness** (restored: system prompt every turn, identity model routing). Same seeds as Arm A.
+- **Validation N=5 (seeds 2001–2005): success 0.874 ± 0.056, cost/successful task $0.022 ± $0.008, 0 harness errors.** vs Arm A validation 0.806 ± 0.047 @ $0.062 → **+6.8pp success, −65% cost**. Advantage *held* on the held-out set (unlike Arm B's proxy-overfit).
+- Proxy N=5 (seeds 1001–1005): success 0.650 ± 0.109, cost/successful task $0.033 ± $0.010, 0 harness errors (vs Arm A proxy 0.583 @ $0.083).
+- Figure: `experiments/plots/armA_vs_armC_frontier_validation_20260722.png` (3 arms: A v0.1/gpt-4.1, B v0.2/gpt-4.1, C v0.1/Inkling).
+- Key wiring facts: LiteLLM's `together_ai` provider silently **drops tool schemas** (with TAU2's `drop_params=True`) → must use the `openai/` + `api_base` path so tools flow. Inkling isn't in LiteLLM's price table → `settings/pricing.py` registers it under the **openai** provider (else cost records $0). Arm identity in `plot_results.py` now keys on `split / harness / model` so Arm A and Arm C don't merge.
+- New/changed surfaces (M3, uncommitted pending review): `settings/pricing.py` (+test), `settings/config.py` (`AGENT_API_BASE`/`AGENT_API_KEY` + pricing registration), `benchmark/adapter.py` (`_agent_llm_args`), v0.1 restore of `target_agent/harness.py` + `model_routing.py` (+`tests/test_harness.py`), `scripts/plot_results.py` model-aware arm label, `.env.example`.
 
 **Standing workflow (applies to every milestone):** when starting a new task in a build sequence, read `/Users/mihirsawhney/Projects/TaskEvolve/systems_design.md` and `/Users/mihirsawhney/Projects/TaskEvolve/experiment.md` first to confirm what you build is compliant with those documents. Use subagent-driven development. After completing each sequence, stop so I can review / give feedback before the next.
 

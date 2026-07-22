@@ -74,6 +74,26 @@ def _require_agent_model(agent_model: Optional[str]) -> str:
     return model
 
 
+def _agent_llm_args(llm_args: Optional[dict]) -> dict:
+    """Agent LLM args, adding the OpenAI-compatible endpoint for the open-weight arms.
+
+    Starts from the caller's args (or TAU2's agent defaults) and, when
+    ``config.AGENT_API_BASE`` is set (Arms C/D via Together's OpenAI-compatible
+    endpoint), threads the base URL + key through to ``litellm.completion`` so the
+    request carries the tool schemas. Unset for the closed arms (A/B) — their args
+    are returned untouched.
+    """
+    args = dict(llm_args) if llm_args is not None else dict(DEFAULT_LLM_ARGS_AGENT)
+    if config.AGENT_API_BASE:
+        args.setdefault("api_base", config.AGENT_API_BASE)
+        if config.AGENT_API_KEY:
+            args.setdefault("api_key", config.AGENT_API_KEY)
+    # Newer models (e.g. Opus 4.8) reject `temperature`; litellm won't drop it.
+    if config.AGENT_NO_TEMPERATURE:
+        args.pop("temperature", None)
+    return args
+
+
 def _load_task(domain: str, task_id: str) -> Task:
     """Return the task with ``task_id`` from ``domain``'s full task set.
 
@@ -180,7 +200,7 @@ def run_eval(
         tools=environment.get_tools(),
         domain_policy=environment.get_policy(),
         llm=model,
-        llm_args=dict(llm_args) if llm_args is not None else dict(DEFAULT_LLM_ARGS_AGENT),
+        llm_args=_agent_llm_args(llm_args),
     )
 
     # TAU2's frozen user simulator, built via TAU2's own helper.
