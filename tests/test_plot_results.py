@@ -29,7 +29,7 @@ from scripts.plot_results import (
 def _write_csv(path: Path, rows: list[dict]) -> Path:
     """Write rows to a results-style CSV and return the path."""
     fields = [
-        "split", "harness_version", "num_tasks", "pass_rate",
+        "split", "harness_version", "agent_model", "num_tasks", "pass_rate",
         "total_cost_usd", "cost_per_successful_task",
     ]
     with path.open("w", newline="", encoding="utf-8") as handle:
@@ -39,10 +39,12 @@ def _write_csv(path: Path, rows: list[dict]) -> Path:
     return path
 
 
-def _row(split="proxy", pass_rate="0.5", cost="0.6", cps="0.1", num_tasks="12") -> dict:
+def _row(split="proxy", pass_rate="0.5", cost="0.6", cps="0.1", num_tasks="12",
+         agent_model="gpt-4.1") -> dict:
     return {
-        "split": split, "harness_version": "v0.1", "num_tasks": num_tasks,
-        "pass_rate": pass_rate, "total_cost_usd": cost, "cost_per_successful_task": cps,
+        "split": split, "harness_version": "v0.1", "agent_model": agent_model,
+        "num_tasks": num_tasks, "pass_rate": pass_rate,
+        "total_cost_usd": cost, "cost_per_successful_task": cps,
     }
 
 
@@ -53,7 +55,24 @@ def test_row_to_point_computes_cost_per_task():
     assert point is not None
     assert point.cost_per_task == pytest.approx(0.05)
     assert point.pass_rate == pytest.approx(0.5)
-    assert point.arm == "proxy / v0.1"
+    assert point.arm == "proxy / v0.1 / gpt-4.1"
+
+
+def test_arm_label_distinguishes_models_at_same_split_and_harness():
+    # Arm A (gpt-4.1) and Arm C (Inkling) both run proxy at v0.1 — they must NOT
+    # collapse into one arm on the plot. The short model tag keeps them distinct.
+    arm_a = _row_to_point(_row(agent_model="gpt-4.1"))
+    arm_c = _row_to_point(_row(agent_model="together_ai/thinkingmachines/Inkling"))
+    assert arm_a.arm == "proxy / v0.1 / gpt-4.1"
+    assert arm_c.arm == "proxy / v0.1 / Inkling"
+    assert arm_a.arm != arm_c.arm
+
+
+def test_arm_label_omits_model_when_absent():
+    # Backward compatible with CSV rows that predate the agent_model column.
+    row = _row()
+    del row["agent_model"]
+    assert _row_to_point(row).arm == "proxy / v0.1"
 
 
 def test_row_to_point_returns_none_when_num_tasks_zero():
@@ -130,7 +149,7 @@ def test_load_points_filters_by_split(tmp_path):
     csv_path = _write_csv(tmp_path / "results.csv", [_row(split="proxy"), _row(split="smoke")])
     points = load_points(csv_path, split="proxy")
     assert len(points) == 1
-    assert points[0].arm == "proxy / v0.1"
+    assert points[0].arm == "proxy / v0.1 / gpt-4.1"
 
 
 def test_load_points_raises_when_csv_missing(tmp_path):
