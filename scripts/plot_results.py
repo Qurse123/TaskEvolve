@@ -64,6 +64,7 @@ class RunPoint(NamedTuple):
     cost_per_task: float
     pass_rate: float
     cost_per_successful_task: Optional[float]
+    agent_model: Optional[str] = None
 
 
 class MetricSpec(NamedTuple):
@@ -116,13 +117,32 @@ def _row_to_point(row: Dict[str, str]) -> Optional[RunPoint]:
     pass_rate = _as_float(row.get("pass_rate"))
     if cost is None or not num_tasks or pass_rate is None:
         return None
-    arm = f"{row.get('split', '?')} / {row.get('harness_version', '?')}"
+    agent_model = row.get("agent_model")
     return RunPoint(
-        arm=arm,
+        arm=_arm_label(row),
         cost_per_task=cost / num_tasks,
         pass_rate=pass_rate,
         cost_per_successful_task=_as_float(row.get("cost_per_successful_task")),
+        agent_model=agent_model,
     )
+
+
+def _short_model(agent_model: str) -> str:
+    """Last path segment of a model id (``together_ai/thinkingmachines/Inkling`` ->
+    ``Inkling``; ``gpt-4.1`` -> ``gpt-4.1``)."""
+    return agent_model.rsplit("/", 1)[-1]
+
+
+def _arm_label(row: Dict[str, str]) -> str:
+    """Arm identity for grouping/legend: split / harness / model.
+
+    The model tag is what keeps Arm A (gpt-4.1) and Arm C (Inkling) — which share
+    a split and the static v0.1 harness — from collapsing into one cloud. Omitted
+    for rows that predate the agent_model column (backward compatible).
+    """
+    base = f"{row.get('split', '?')} / {row.get('harness_version', '?')}"
+    model = row.get("agent_model")
+    return f"{base} / {_short_model(model)}" if model else base
 
 
 def plot_per_metric(
