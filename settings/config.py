@@ -17,10 +17,18 @@ import os
 
 from dotenv import load_dotenv
 
+from settings.pricing import register_pricing
+
 # Load .env so the model constants below resolve. Real environment variables
 # win over .env values; calling this at import keeps `from settings.config
 # import AGENT_MODEL` self-sufficient.
 load_dotenv()
+
+# Register per-token prices for open-weight models LiteLLM doesn't know (Inkling,
+# Arms C/D). Done at config import — which every run path imports before any
+# generate() call — so litellm.completion_cost prices those models instead of
+# silently returning 0.0. No-op for closed models LiteLLM already prices.
+register_pricing()
 
 # --- Models (sourced from .env; never hardcoded) ---
 # Closed LLM under test for the agent. Required — set AGENT_MODEL in .env.
@@ -32,6 +40,22 @@ USER_MODEL = os.environ.get("USER_MODEL")
 # harness edits. Separate from AGENT_MODEL — the iterator runs a strong
 # closed-weight model. Required only when running the iterator (Milestone 2).
 ITERATOR_MODEL = os.environ.get("ITERATOR_MODEL")
+
+# OpenAI-compatible endpoint for the agent model (Arms C/D). When set, the agent
+# reaches its model through this base URL with AGENT_API_KEY — e.g. Together's
+# https://api.together.xyz/v1 serving Inkling. This path forwards tool schemas
+# intact (the together_ai provider drops them). Unset for the closed arms (A/B),
+# which use their provider's default routing, so their behavior is unchanged.
+AGENT_API_BASE = os.environ.get("AGENT_API_BASE")
+# Key for AGENT_API_BASE; falls back to TOGETHER_API_KEY so the open-weight arms
+# work with only the Together key set. None when no open-weight endpoint is used.
+AGENT_API_KEY = os.environ.get("AGENT_API_KEY") or os.environ.get("TOGETHER_API_KEY")
+# Some newer models (e.g. the Opus 4.8 frontier reference) reject the
+# ``temperature`` param, and litellm's drop_params doesn't strip it for them. Set
+# AGENT_NO_TEMPERATURE=1 to drop temperature from the agent call for those models.
+AGENT_NO_TEMPERATURE = os.environ.get("AGENT_NO_TEMPERATURE", "").strip().lower() in (
+    "1", "true", "yes", "on",
+)
 
 # --- Evaluation ---
 # Reward at or above which a task counts as a pass (design §3.3).
