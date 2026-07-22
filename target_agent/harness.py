@@ -19,15 +19,12 @@ def build_messages(
 ) -> list[Message]:
     """Return the full message list to pass to generate().
 
-    M2 tweak (ticket t4): only include the verbose system messages on the very
-    first generation call. After the first turn, the model already has those
-    instructions in context, so re-sending them wastes tokens.
+    Static Arm A v0.1 harness: pass-through — system + history with no
+    compression, so the system prompt/policy is present on every turn. This is
+    the frozen baseline the open-weight arms (C/D) run against; the Arm B iterator
+    variant (v0.2, drop-system-after-turn-1) lives on its own branch.
     """
-    # If this is the first turn (no prior user/assistant messages), include
-    # the system prompts; otherwise omit them to save tokens.
-    if len(history) == 0:
-        return [*system_messages]
-    return list(history)
+    return [*system_messages, *history]
 
 
 def filter_tools(tools: list[Tool]) -> list[Tool]:

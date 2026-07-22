@@ -9,11 +9,40 @@ from __future__ import annotations
 from types import SimpleNamespace
 from pathlib import Path
 
-from benchmark.adapter import _normalize, _persist_transcript
+from benchmark.adapter import _agent_llm_args, _normalize, _persist_transcript
+from settings import config
 
 
 def _msg(tool_calls=None):
     return SimpleNamespace(tool_calls=tool_calls)
+
+
+def test_agent_llm_args_default_keeps_temperature_no_endpoint(monkeypatch) -> None:
+    # Closed arms A/B: no open-weight endpoint, temperature kept (TAU2 default).
+    monkeypatch.setattr(config, "AGENT_API_BASE", None)
+    monkeypatch.setattr(config, "AGENT_NO_TEMPERATURE", False)
+    args = _agent_llm_args(None)
+    assert "api_base" not in args
+    assert "temperature" in args
+
+
+def test_agent_llm_args_adds_openai_compatible_endpoint(monkeypatch) -> None:
+    # Open-weight arms (Inkling via Together): base URL + key threaded through.
+    monkeypatch.setattr(config, "AGENT_API_BASE", "https://api.together.xyz/v1")
+    monkeypatch.setattr(config, "AGENT_API_KEY", "sk-test")
+    monkeypatch.setattr(config, "AGENT_NO_TEMPERATURE", False)
+    args = _agent_llm_args(None)
+    assert args["api_base"] == "https://api.together.xyz/v1"
+    assert args["api_key"] == "sk-test"
+
+
+def test_agent_llm_args_drops_temperature_when_flagged(monkeypatch) -> None:
+    # Frontier reference (Opus 4.8) deprecates `temperature`; the flag strips it.
+    monkeypatch.setattr(config, "AGENT_API_BASE", None)
+    monkeypatch.setattr(config, "AGENT_NO_TEMPERATURE", True)
+    args = _agent_llm_args({"temperature": 0.0, "max_tokens": 10})
+    assert "temperature" not in args
+    assert args["max_tokens"] == 10
 
 
 def _sim(messages, *, reward=1.0):
