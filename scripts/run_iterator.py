@@ -61,6 +61,7 @@ def run_iterator(
     max_iterations: int,
     seed_start: int,
     split: str = "proxy",
+    agent_model: Optional[str] = None,
     max_search_cost_usd: Optional[float] = None,
     max_minutes: Optional[float] = None,
     clock: Callable[[], float] = time.monotonic,
@@ -85,10 +86,13 @@ def run_iterator(
     harness version advance only on accepted iterations.
     """
     current_version = initial_version or config.HARNESS_VERSION
+    # Pin the campaign to one agent model so the shared results.csv / logs (which
+    # now hold gpt-4.1, Inkling and Opus runs) don't blend into the baseline.
+    agent_model = agent_model or config.AGENT_MODEL
     best = (
         initial_best
         if initial_best is not None
-        else load_distribution(split, current_version)
+        else load_distribution(split, current_version, agent_model=agent_model)
     )
     provide_backlog = generate_backlog or _default_backlog_fn(
         split=split,
@@ -96,6 +100,7 @@ def run_iterator(
         repo_root=repo_root,
         logs_root=logs_root,
         n=tickets_per_backlog,
+        agent_model=agent_model,
     )
 
     results: List[IterationResult] = []
@@ -219,6 +224,7 @@ def _default_backlog_fn(
     repo_root: Union[str, Path],
     logs_root: Union[str, Path],
     n: int,
+    agent_model: Optional[str] = None,
 ) -> BacklogFn:
     """Real backlog provider: summarize the current-best proxy run, then ask the LLM.
 
@@ -231,7 +237,8 @@ def _default_backlog_fn(
     ) -> Tuple[Sequence[Ticket], float]:
         tracker = CostTrackingCompletion()
         feedback = build_feedback(
-            split, harness_version=current_version, logs_root=logs_root
+            split, harness_version=current_version, agent_model=agent_model,
+            logs_root=logs_root,
         )
         tickets = generate_tickets(
             feedback,

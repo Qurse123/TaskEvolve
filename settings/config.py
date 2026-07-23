@@ -40,6 +40,12 @@ USER_MODEL = os.environ.get("USER_MODEL")
 # harness edits. Separate from AGENT_MODEL — the iterator runs a strong
 # closed-weight model. Required only when running the iterator (Milestone 2).
 ITERATOR_MODEL = os.environ.get("ITERATOR_MODEL")
+# Some editor models (e.g. Opus 4.8) reject the `temperature` param and litellm's
+# drop_params won't strip it. Set ITERATOR_NO_TEMPERATURE=1 to drop temperature
+# from the editor's LLM call (mirrors AGENT_NO_TEMPERATURE for the agent).
+ITERATOR_NO_TEMPERATURE = os.environ.get("ITERATOR_NO_TEMPERATURE", "").strip().lower() in (
+    "1", "true", "yes", "on",
+)
 
 # OpenAI-compatible endpoint for the agent model (Arms C/D). When set, the agent
 # reaches its model through this base URL with AGENT_API_KEY — e.g. Together's

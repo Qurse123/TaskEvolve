@@ -129,14 +129,18 @@ def _litellm_raw(prompt: str) -> Any:
             "ITERATOR_MODEL is not set. Define it in .env (see .env.example), "
             "e.g. ITERATOR_MODEL=claude-opus-4-8"
         )
-    return litellm.completion(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.0,
+    kwargs: dict = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
         # The editor model is swappable via .env; reasoning models (o-series)
         # reject temperature — drop_params strips what the model can't take.
-        drop_params=True,
-    )
+        "drop_params": True,
+    }
+    # Some models (e.g. Opus 4.8) reject temperature outright and drop_params
+    # won't strip it, so omit it entirely when ITERATOR_NO_TEMPERATURE is set.
+    if not config.ITERATOR_NO_TEMPERATURE:
+        kwargs["temperature"] = 0.0
+    return litellm.completion(**kwargs)
 
 
 def _content_of(response: Any) -> str:
