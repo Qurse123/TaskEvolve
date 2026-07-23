@@ -62,6 +62,7 @@ def load_distribution(
     split: str,
     harness_version: str,
     *,
+    agent_model: Optional[str] = None,
     csv_path: Union[str, Path] = DEFAULT_RESULTS_CSV,
 ) -> Distribution:
     """Summarize the ``results.csv`` rows for one ``(split, harness_version)``.
@@ -69,6 +70,10 @@ def load_distribution(
     Args:
         split: Split label to match (e.g. ``"proxy"``).
         harness_version: Harness version to match (e.g. ``"v0.1"`` for Arm A).
+        agent_model: When given, also require ``agent_model`` to match — so a
+            campaign for one model isn't contaminated by other models' runs that
+            share the same ``(split, harness_version)`` in the ledger. ``None``
+            keeps the legacy model-blind behavior.
         csv_path: Path to the per-run results ledger.
 
     Returns:
@@ -91,6 +96,8 @@ def load_distribution(
     with csv_path.open(newline="", encoding="utf-8") as handle:
         for row in csv.DictReader(handle):
             if row.get("split") != split or row.get("harness_version") != harness_version:
+                continue
+            if agent_model is not None and row.get("agent_model") != agent_model:
                 continue
             pass_rate = _parse_float(row.get("pass_rate"))
             if pass_rate is None:
