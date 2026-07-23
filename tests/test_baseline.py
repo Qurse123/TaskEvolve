@@ -24,12 +24,13 @@ def _write_csv(path: Path, rows: list[dict]) -> None:
             writer.writerow({key: row.get(key) for key in SUMMARY_FIELDS})
 
 
-def _row(run_id: str, *, split: str, harness_version: str, pass_rate, cps) -> dict:
+def _row(run_id: str, *, split: str, harness_version: str, pass_rate, cps,
+         agent_model: str = "gpt-4.1") -> dict:
     return {
         "run_id": run_id,
         "split": split,
         "domain": "retail",
-        "agent_model": "gpt-4.1",
+        "agent_model": agent_model,
         "harness_version": harness_version,
         "num_tasks": 12,
         "num_passed": int(round(float(pass_rate) * 12)),
@@ -80,6 +81,43 @@ def test_filters_by_split_and_harness_version(tmp_path):
     assert dist.n == 2
     assert dist.pass_rate_mean == pytest.approx(0.6)
     assert dist.run_ids == ("proxy_1", "proxy_2")
+
+
+def test_filters_by_agent_model(tmp_path):
+    # The ledger now holds several models at the same (split, harness). A campaign
+    # must load only its own model's runs, or the baseline blends models.
+    csv_path = tmp_path / "results.csv"
+    _write_csv(
+        csv_path,
+        [
+            _row("g1", split="proxy", harness_version="v0.1", pass_rate=0.5, cps=0.08,
+                 agent_model="gpt-4.1"),
+            _row("g2", split="proxy", harness_version="v0.1", pass_rate=0.7, cps=0.10,
+                 agent_model="gpt-4.1"),
+            # Same split+version, different model — must be excluded when filtering.
+            _row("ink", split="proxy", harness_version="v0.1", pass_rate=0.9, cps=0.02,
+                 agent_model="openai/thinkingmachines/Inkling"),
+        ],
+    )
+
+    dist = load_distribution(
+        "proxy", "v0.1", agent_model="gpt-4.1", csv_path=csv_path
+    )
+
+    assert dist.n == 2
+    assert dist.run_ids == ("g1", "g2")
+    assert dist.pass_rate_mean == pytest.approx(0.6)
+
+
+def test_no_matching_agent_model_raises(tmp_path):
+    csv_path = tmp_path / "results.csv"
+    _write_csv(
+        csv_path,
+        [_row("g1", split="proxy", harness_version="v0.1", pass_rate=0.5, cps=0.08,
+              agent_model="gpt-4.1")],
+    )
+    with pytest.raises(ValueError):
+        load_distribution("proxy", "v0.1", agent_model="no-such-model", csv_path=csv_path)
 
 
 def test_load_distribution_computes_cost_per_task(tmp_path):
