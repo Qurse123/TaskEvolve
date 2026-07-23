@@ -15,6 +15,7 @@ import pytest
 
 from iterator_agent.edit_guard import EditPolicy
 from iterator_agent.feedback import FeedbackSummary, TaskRecord
+from iterator_agent import researcher as _researcher_mod
 from iterator_agent.researcher import (
     CostTrackingCompletion,
     ProposedEdit,
@@ -23,6 +24,34 @@ from iterator_agent.researcher import (
     render_propose,
     run_editor,
 )
+from settings import config as _config
+
+
+def test_litellm_raw_gates_temperature_on_flag(monkeypatch):
+    # Opus 4.8 rejects `temperature` and litellm won't drop it → ITERATOR_NO_TEMPERATURE
+    # must omit it; temperature-accepting models still get temperature=0.0.
+    import litellm
+
+    captured: dict = {}
+
+    def fake_completion(**kwargs):
+        captured.clear()
+        captured.update(kwargs)
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="{}"))],
+            _hidden_params={"response_cost": 0.0},
+        )
+
+    monkeypatch.setattr(litellm, "completion", fake_completion)
+    monkeypatch.setattr(_config, "ITERATOR_MODEL", "anthropic/claude-opus-4-8")
+
+    monkeypatch.setattr(_config, "ITERATOR_NO_TEMPERATURE", True)
+    _researcher_mod._litellm_raw("hi")
+    assert "temperature" not in captured
+
+    monkeypatch.setattr(_config, "ITERATOR_NO_TEMPERATURE", False)
+    _researcher_mod._litellm_raw("hi")
+    assert captured.get("temperature") == 0.0
 
 _FAIL_7 = TaskRecord("retail_7", reward=0.0, passed=False, cost_usd=0.2, termination_reason="max_steps", seed=1, turn_count=30, tool_call_count=12)
 _FAIL_9 = TaskRecord("retail_9", reward=0.0, passed=False, cost_usd=0.3, termination_reason="max_steps", seed=1, turn_count=40, tool_call_count=15)
