@@ -1,0 +1,1135 @@
+2026-07-23 00:02:09.541 | INFO     | tau2.utils.utils:<module>:28 - Using data directory from source: /Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/data
+2026-07-23 00:02:12.673 | INFO     | tau2.utils.llm_utils:<module>:102 - LiteLLM: Cache is disabled
+2026-07-23 00:02:12.754 | DEBUG    | tau2.registry:<module>:281 - Registering default components...
+2026-07-23 00:02:12.760 | DEBUG    | tau2.registry:<module>:292 - Voice dependencies not installed, skipping voice user registration
+2026-07-23 00:02:12.761 | DEBUG    | tau2.registry:<module>:350 - Default components registered successfully. Registry info: {
+  "domains": [
+    "mock",
+    "airline",
+    "retail",
+    "telecom",
+    "telecom-workflow",
+    "banking_knowledge"
+  ],
+  "agents": [
+    "llm_agent",
+    "llm_agent_gt",
+    "llm_agent_solo",
+    "discrete_time_audio_native_agent"
+  ],
+  "users": [
+    "user_simulator",
+    "dummy_user"
+  ],
+  "task_sets": [
+    "mock",
+    "airline",
+    "retail",
+    "telecom_full",
+    "telecom_small",
+    "telecom",
+    "telecom-workflow",
+    "banking_knowledge"
+  ]
+}
+validation baseline: 35 task(s) x 1 repeat(s), seeds 2005..2005, domain=retail
+Started run validation_20260723_040212 -> experiments/logs/validation_20260723_040212
+2026-07-23 00:02:12.898 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 88 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 88 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_88.json
+2026-07-23 00:02:12.959 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 44 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 44 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_44.json
+2026-07-23 00:02:13.032 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 83 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 83 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_83.json
+2026-07-23 00:02:13.097 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 43 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 43 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_43.json
+2026-07-23 00:02:13.175 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 78 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 78 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_78.json
+2026-07-23 00:02:13.285 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 82 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 82 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_82.json
+2026-07-23 00:02:13.503 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 104 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 104 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_104.json
+2026-07-23 00:02:13.613 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 24 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 24 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_24.json
+2026-07-23 00:02:13.704 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 25 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 25 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_25.json
+2026-07-23 00:02:13.824 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 63 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 63 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_63.json
+2026-07-23 00:02:13.920 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 81 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 81 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_81.json
+2026-07-23 00:02:14.017 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 2 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 2 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_2.json
+2026-07-23 00:02:14.095 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 87 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 87 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_87.json
+2026-07-23 00:02:14.161 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 98 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 98 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_98.json
+2026-07-23 00:02:14.236 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 84 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 84 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_84.json
+2026-07-23 00:02:14.302 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 80 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 80 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_80.json
+2026-07-23 00:02:14.370 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 30 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 30 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_30.json
+2026-07-23 00:02:14.446 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 89 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 89 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_89.json
+2026-07-23 00:02:14.644 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 34 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 34 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_34.json
+2026-07-23 00:02:14.715 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 21 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 21 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_21.json
+2026-07-23 00:02:14.803 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 48 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 48 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_48.json
+2026-07-23 00:02:14.867 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 29 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 29 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_29.json
+2026-07-23 00:02:14.919 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 76 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 76 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_76.json
+2026-07-23 00:02:14.977 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 31 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 31 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_31.json
+2026-07-23 00:02:15.038 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 96 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 96 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_96.json
+2026-07-23 00:02:15.125 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 7 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 7 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_7.json
+2026-07-23 00:02:15.176 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 67 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 67 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_67.json
+2026-07-23 00:02:15.231 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 95 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 95 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_95.json
+2026-07-23 00:02:15.312 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 11 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 11 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_11.json
+2026-07-23 00:02:15.383 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 75 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 75 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_75.json
+2026-07-23 00:02:15.628 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 28 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 28 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_28.json
+2026-07-23 00:02:15.705 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 37 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 37 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_37.json
+2026-07-23 00:02:15.844 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 13 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 13 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_13.json
+2026-07-23 00:02:15.950 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 0 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 0 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_0.json
+2026-07-23 00:02:16.051 | INFO     | tau2.orchestrator.orchestrator:_validate_mode_compatibility:477 - Orchestrator initialized in HALF_DUPLEX mode (turn-based) with agent=TaskEvolveAgent, user=UserSimulator
+  task 106 (seed=2005) failed permanently; recording as failure: 'str' object has no attribute 'stripc'
+Traceback (most recent call last):
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 161, in _run_one_repeat
+    result = _run_task_with_retries(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/scripts/run_train_eval.py", line 111, in _run_task_with_retries
+    return run_eval(
+           ^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/benchmark/adapter.py", line 226, in run_eval
+    sim = run_simulation(orchestrator, evaluation_type=EvaluationType.ALL)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/runner/simulation.py", line 59, in run_simulation
+    simulation = orchestrator.run()
+                 ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 275, in run
+    self.initialize()
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/orchestrator/orchestrator.py", line 632, in initialize
+    self.agent_state = self.agent.get_init_state(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/vendor/tau2-bench/src/tau2/agent/llm_agent.py", line 101, in get_init_state
+    system_messages=[SystemMessage(role="system", content=self.system_prompt)],
+                                                          ^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 69, in system_prompt
+    policy = _render("policy_summary.j2", domain_policy=self.domain_policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mihirsawhney/Projects/TaskEvolve/target_agent/agent.py", line 43, in _render
+    return _JINJA_ENV.get_template(template_name).render(**ctx).stripc()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'stripc'. Did you mean: 'strip'?
+Logged task 106 (reward=0.00) -> experiments/logs/validation_20260723_040212/task_106.json
+Finalized run validation_20260723_040212: 0/35 passed, summary -> experiments/logs/validation_20260723_040212/run_summary.json
+  run validation_20260723_040212 (seed=2005): pass_rate=0.000 cost_per_success=n/a cost_per_task=n/a harness_errors=35
+============================================================
+validation baseline over 1 repeat(s):
+  pass_rate:                0.0000 ± 0.0000 (n=1)
+  cost_per_successful_task: n/a (no cost data)
+  per-run rows preserved in experiments/results.csv
+============================================================
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+

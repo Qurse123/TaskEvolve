@@ -96,6 +96,7 @@ def find_latest_run_dir_for_version(
     split: str,
     harness_version: str,
     *,
+    agent_model: Optional[str] = None,
     logs_root: Union[str, Path] = DEFAULT_LOGS_ROOT,
     csv_path: Union[str, Path] = DEFAULT_RESULTS_CSV,
 ) -> Path:
@@ -107,8 +108,12 @@ def find_latest_run_dir_for_version(
     so we pick the lexically greatest matching ``run_id`` (names embed a sortable
     ``YYYYMMDD_HHMMSS`` stamp).
 
+    ``agent_model``, when given, further restricts to that model's runs — so a
+    campaign for one model never diagnoses another model's run that happens to
+    share ``(split, harness_version)`` in the ledger.
+
     Raises:
-        ValueError: If the CSV is missing or no row matches ``(split, version)``.
+        ValueError: If the CSV is missing or no row matches.
     """
     csv_path = Path(csv_path)
     if not csv_path.exists():
@@ -116,12 +121,15 @@ def find_latest_run_dir_for_version(
     run_ids = [
         row.get("run_id") or ""
         for row in csv.DictReader(csv_path.open(newline="", encoding="utf-8"))
-        if row.get("split") == split and row.get("harness_version") == harness_version
+        if row.get("split") == split
+        and row.get("harness_version") == harness_version
+        and (agent_model is None or row.get("agent_model") == agent_model)
     ]
     run_ids = [rid for rid in run_ids if rid]
     if not run_ids:
         raise ValueError(
-            f"no run in {csv_path} for split={split!r} harness_version={harness_version!r}"
+            f"no run in {csv_path} for split={split!r} "
+            f"harness_version={harness_version!r} agent_model={agent_model!r}"
         )
     return Path(logs_root) / max(run_ids)
 
@@ -280,6 +288,7 @@ def build_feedback(
     split: str = "proxy",
     *,
     harness_version: Optional[str] = None,
+    agent_model: Optional[str] = None,
     logs_root: Union[str, Path] = DEFAULT_LOGS_ROOT,
     csv_path: Union[str, Path] = DEFAULT_RESULTS_CSV,
 ) -> FeedbackSummary:
@@ -287,13 +296,16 @@ def build_feedback(
 
     When ``harness_version`` is given, summarize the newest run for *that* version —
     the current-best harness — so the editor never reasons over a reverted candidate.
-    Falls back to the newest run of any version when the version has no run yet (e.g.
-    the first iteration off the Arm A baseline that produced no version-tagged row).
+    ``agent_model`` further pins diagnosis to one model's runs (avoids cross-model
+    contamination when the ledger holds several models at the same version). Falls
+    back to the newest run of any version when the version has no run yet (e.g. the
+    first iteration off the Arm A baseline that produced no version-tagged row).
     """
     if harness_version is not None:
         try:
             run_dir = find_latest_run_dir_for_version(
-                split, harness_version, logs_root=logs_root, csv_path=csv_path
+                split, harness_version, agent_model=agent_model,
+                logs_root=logs_root, csv_path=csv_path,
             )
         except ValueError:
             run_dir = find_latest_run_dir(split, logs_root=logs_root)
