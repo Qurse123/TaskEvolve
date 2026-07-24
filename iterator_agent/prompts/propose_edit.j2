@@ -12,9 +12,13 @@ Propose exactly ONE change to ONE file that should reduce the MEAN COST PER TASK
 without lowering task success (success is a hard floor). Keep the change focused
 enough to attribute its effect.
 
-Model constraint: the only valid model names are "gpt-4.1" and "gpt-4.1-mini".
-If your change touches model routing, use gpt-4.1-mini as the cheap option —
-NEVER reference any other model (no gpt-3.5*, no gpt-4o*, nothing else).
+Model constraint: the only valid model names are "anthropic/claude-opus-4-8"
+(strongest, $5/$25 per 1M tokens), "anthropic/claude-sonnet-5" (mid, $2/$10), and
+"anthropic/claude-haiku-4-5" (cheapest/fastest, $1/$5). NEVER reference any other
+model. If you edit model_routing.py, note get_model(configured_model, history)
+receives the conversation so far — you may route to a cheaper model on simple/early
+turns and a stronger one on hard/later turns, but only where the cheaper model
+still holds task success (success is the hard floor).
 
 Respond with ONLY a JSON object (no prose, no markdown fences) of the form:
 {
