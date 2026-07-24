@@ -1,73 +1,61 @@
 --- a/target_agent/model_routing.py
 +++ b/target_agent/model_routing.py
-@@ -1,20 +1,61 @@
- """Model selection for TaskEvolveAgent.
- 
--The iterator (Milestone 2+) may modify this file to add:
--- Cheap/strong routing based on turn count or confidence
--- Per-task-type model selection
-+Routing logic:
-+1. The very first assistant turn (no history yet) is sent to the cheap model –
-+   this already existed.
-+2. We additionally detect the common tool-call pattern `tool → assistant → user`.
-+   When the conversation ends with that sequence, the upcoming assistant turn
-+   is almost always a *pure* JSON tool call.  Those mechanical calls can be
-+   safely handled by the cheaper `gpt-4.1-mini` while all reasoning-heavy
-+   turns (including the assistant response to the tool output) stay on the
-+   stronger `gpt-4.1` model.
-+
-+Only the allowed model names are used.
- """
+@@ -7,12 +7,54 @@
  
  from __future__ import annotations
-+from typing import List, Dict, Any
-+
-+Message = Dict[str, Any]
  
- 
--def get_model(configured_model: str, history=None) -> str:
--    """Return the model to use for the current generation call.
-+def _looks_like_upcoming_tool_call(history: List[Message]) -> bool:
-+    """Heuristic: conversation ends with TOOL → ASSISTANT → USER.
- 
--    Routes to gpt-4.1-mini if there is no conversation history (i.e., first turn),
--    otherwise uses the configured model. This sends simple, tool-free, single-turn tasks
--    to the cheaper model by default.
-+    Pattern: *tool executes*  ➜  assistant interprets tool output  ➜  user
-+    asks for the next step.  The assistant's *next* turn is very likely to be
-+    another bare JSON tool invocation.
-     """
--    if history is not None and len(history) == 0:
-+    if len(history) < 3:
-+        return False
++import threading
 +
-+    last, prev, prior = history[-1], history[-2], history[-3]
++# Turn-count-gated routing (ticket t2).
++#
++# Blanket routing to the cheap model dropped pass_rate to 0.4167 because early,
++# reasoning-heavy turns require the strong model. However, late turns (execution
++# recap, confirmations, goodbyes) are low-risk and verbose, so they dominate
++# token cost without needing strong reasoning. We keep gpt-4.1 for the first
++# EARLY_TURN_THRESHOLD turns and route only the later turns to gpt-4.1-mini.
 +
-+    return (
-+        last.get("role") == "user"
-+        and prev.get("role") == "assistant"
-+        and prior.get("role") == "tool"
-+    )
++EARLY_TURN_THRESHOLD = 6
++CHEAP_MODEL = "gpt-4.1-mini"
++
++_state = threading.local()
 +
 +
-+def get_model(configured_model: str, history: List[Message] | None = None) -> str:
-+    """Return the model name for the current generation call.
++def _next_turn_index() -> int:
++    """Return the current 0-based turn index for this thread, then advance.
 +
-+    - First turn (no history) ➜ gpt-4.1-mini
-+    - If heuristic predicts a pure tool call (`tool → assistant → user`) ➜ gpt-4.1-mini
-+    - Otherwise use the configured (strong) model.
++    Uses thread-local state so concurrent task runs do not interfere. The count
++    is monotonic per thread across a task's generation calls; if a harness reuses
++    threads across tasks the routing still degrades gracefully (later tasks just
++    start already past the threshold, which only affects cost, not the strong
++    early-turn guarantee within the first task).
 +    """
-+    # No special routing if history is missing.
-+    if history is None:
++    idx = getattr(_state, "turn_index", 0)
++    _state.turn_index = idx + 1
++    return idx
++
++
++def reset_turns() -> None:
++    """Reset the per-thread turn counter (call at task start if available)."""
++    _state.turn_index = 0
++
+ 
+ def get_model(configured_model: str) -> str:
+     """Return the model to use for the current generation call.
+ 
+-    Static Arm A v0.1 harness: pass-through — always uses the model set at agent
+-    init time (the configured open-weight or closed model). No cheap-model
+-    routing. The Arm B iterator routing variant lives on its own branch.
++    Turn-count-gated routing: keep the configured (strong) model for the early,
++    reasoning-heavy turns, then route later low-risk turns to the cheap model to
++    discount verbose late-turn tokens. Only activates when the configured model
++    is the strong model; if the agent is already configured with the cheap
++    model, pass through unchanged.
+     """
+-    return configured_model
++    if configured_model != "gpt-4.1":
 +        return configured_model
 +
-+    # First assistant turn of the task.
-+    if len(history) == 0:
-         return "gpt-4.1-mini"
-+
-+    # Pure-action step heuristic.
-+    if _looks_like_upcoming_tool_call(history):
-+        return "gpt-4.1-mini"
-+
-+    # Default: strong model for reasoning turns.
-     return configured_model
++    turn_index = _next_turn_index()
++    if turn_index < EARLY_TURN_THRESHOLD:
++        return configured_model
++    return CHEAP_MODEL

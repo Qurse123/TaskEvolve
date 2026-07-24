@@ -1,63 +1,46 @@
 --- a/target_agent/harness.py
 +++ b/target_agent/harness.py
-@@ -12,17 +12,56 @@
- from tau2.data_model.message import Message, SystemMessage
- from tau2.environment.tool import Tool
- 
-+# Sliding-window parameters
-+_WINDOW_SIZE: int = 12           # keep this many most-recent dialogue turns verbatim
-+_MAX_SUMMARY_LINES: int = 20     # cap on how many bullet lines go into the summary
-+_MAX_CONTENT_CHARS: int = 60     # truncate each bullet to this length
-+
-+
-+def _summarise(messages: Sequence[Message]) -> SystemMessage:
-+    """Create a lightweight textual digest of the earlier dialogue.
-+
-+    We avoid an extra model call by using a rule-based summary: each omitted
-+    message contributes one bullet listing its role and a truncated version of
-+    its content. The summary is strictly shorter than keeping the raw messages
-+    and still reminds the model of high-level context.
-+    """
-+    summary_lines: list[str] = []
-+    for msg in messages[:_MAX_SUMMARY_LINES]:
-+        # Defensive: guard against absent or non-string content
-+        content = (getattr(msg, "content", "") or "").strip()
-+        if len(content) > _MAX_CONTENT_CHARS:
-+            content = content[: _MAX_CONTENT_CHARS - 3] + "..."
-+        summary_lines.append(f"{msg.role}: {content}")
-+    if len(messages) > _MAX_SUMMARY_LINES:
-+        summary_lines.append("… (further turns omitted) …")
-+
-+    summary_text = (
-+        "Summary of earlier dialogue (compressed for brevity):\n" + "\n".join(summary_lines)
-+    )
-+    return SystemMessage(content=summary_text)
-+
- 
- def build_messages(
-     system_messages: list[SystemMessage],
-     history: Sequence[Message],
+@@ -19,11 +19,39 @@
  ) -> list[Message]:
--    """Return the full message list to pass to generate().
-+    """Return the message list to pass to generate().
+     """Return the full message list to pass to generate().
  
--    M1: pass-through — system + history with no compression. This is the frozen
--    Arm A baseline; the iterator may add sliding-window or summary compression here.
-+    Implements ticket t3: keep only the most-recent _WINDOW_SIZE messages plus
-+    a short textual digest of everything that came before. This prevents prompt
-+    growth on long tasks while preserving immediate context and a lightweight
-+    memory of earlier interactions.
+-    Static Arm A v0.1 harness: pass-through — system + history with no
+-    compression, so the system prompt/policy is present on every turn. This is
+-    the frozen baseline the open-weight arms (C/D) run against; the Arm B iterator
+-    variant (v0.2, drop-system-after-turn-1) lives on its own branch.
++    Arm B iterator variant (t3): the system prompt / policy is expensive to
++    re-send on every turn because build_messages replays the entire growing
++    history plus the full system prompt each call. On high-turn tasks
++    (e.g. 34/31/31 turns) this makes cumulative input tokens scale with turn
++    count, which dominates total cost.
++
++    Change: keep the full system prompt only for the first turn (when history
++    is short enough that the model still needs the freshly-stated policy), and
++    drop the re-sent system prompt on subsequent turns once the policy is
++    already established in the conversation. The assistant has already seen and
++    acted on the policy earlier in the (retained) history, so re-sending it
++    verbatim every turn is redundant.
++
++    We define "turn 1" conservatively: the system prompt is included while the
++    conversation history is still empty or only contains the opening user
++    message(s). Once the assistant has produced at least one message (i.e. the
++    policy has demonstrably been consumed), we stop re-sending the system
++    prompt on every call, cutting the per-turn system-token overhead that
++    scales with turn count.
      """
--    return [*system_messages, *history]
++    # Determine whether the assistant has already engaged with the policy.
++    # role is exposed on tau2 Message objects; treat any assistant-authored
++    # message as evidence the system prompt has been consumed at least once.
++    assistant_has_spoken = any(
++        getattr(msg, "role", None) == "assistant" for msg in history
++    )
 +
-+    # Nothing to compress if the dialogue is short.
-+    if len(history) <= _WINDOW_SIZE:
-+        return [*system_messages, *history]
++    if assistant_has_spoken:
++        # Policy already established earlier in the retained history; skip the
++        # redundant re-send to save cumulative input tokens on high-turn tasks.
++        return [*history]
 +
-+    # Split into earlier (to be summarised) and recent (kept verbatim).
-+    earlier, recent = history[:-_WINDOW_SIZE], history[-_WINDOW_SIZE:]
-+    summary_msg = _summarise(earlier)
-+    return [*system_messages, summary_msg, *recent]
++    # Turn 1 (or pre-first-assistant-response): include the full policy.
+     return [*system_messages, *history]
  
  
- def filter_tools(tools: list[Tool]) -> list[Tool]:

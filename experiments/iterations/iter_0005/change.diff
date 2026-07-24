@@ -1,46 +1,27 @@
---- a/target_agent/harness.py
-+++ b/target_agent/harness.py
-@@ -12,6 +12,21 @@
- from tau2.data_model.message import Message, SystemMessage
- from tau2.environment.tool import Tool
- 
-+# Keep at most this many user/assistant exchanges (pair of messages) in context
-+_MAX_EXCHANGES_TO_KEEP = 10  # 10 exchanges ≈ 20 messages
+--- a/target_agent/prompts/few_shot_examples.j2
++++ b/target_agent/prompts/few_shot_examples.j2
+@@ -1 +1,23 @@
+-{# Empty in Milestone 1 — iterator may populate with example conversations in M2+. #}
++{# Worked example demonstrating the terse verify→lookup→confirm-once→execute flow. #}
++{# Goal: model one-pass confirmation to reduce clarification/confirmation turns. #}
 +
++Example of the desired interaction pattern (be this concise):
 +
-+def _trim_history(history: Sequence[Message]) -> list[Message]:
-+    """Return the most recent portion of history, capped by _MAX_EXCHANGES_TO_KEEP.
++User: I want to return the sweater from my last order and get a refund.
 +
-+    One *exchange* is a user→assistant pair, so we keep 2×N messages.
-+    This sliding-window is a simple, safe way to bound context length.
-+    """
-+    max_msgs = _MAX_EXCHANGES_TO_KEEP * 2  # user + assistant per exchange
-+    if len(history) <= max_msgs:
-+        return list(history)
-+    return list(history[-max_msgs:])
++Assistant (verify identity): To pull up your account, can you confirm your email or order ID?
 +
- 
- def build_messages(
-     system_messages: list[SystemMessage],
-@@ -22,12 +37,18 @@
-     M2 tweak (ticket t4): only include the verbose system messages on the very
-     first generation call. After the first turn, the model already has those
-     instructions in context, so re-sending them wastes tokens.
++User: order #A1029
 +
-+    New (ticket t1): after the first turn, keep only the most recent
-+    `_MAX_EXCHANGES_TO_KEEP` user/assistant exchanges to cap token cost on
-+    long dialogues without hurting task recall.
-     """
--    # If this is the first turn (no prior user/assistant messages), include
--    # the system prompts; otherwise omit them to save tokens.
-+    # First turn: include system prompts verbatim.
-     if len(history) == 0:
-         return [*system_messages]
--    return list(history)
++Assistant (lookup, then confirm ONCE with all details, then act): I found order #A1029 containing 1 Wool Sweater ($48.00). I'll process a return for this item with a refund of $48.00 to your original payment method. Confirm? (yes/no)
 +
-+    # Subsequent turns: trim older messages to save tokens.
-+    trimmed_history = _trim_history(history)
-+    return trimmed_history
- 
- 
- def filter_tools(tools: list[Tool]) -> list[Tool]:
++User: yes
++
++Assistant (execute immediately — no re-summarizing): [calls return/refund tool] Done — return initiated for the Wool Sweater; $48.00 will be refunded to your original payment method in 3–5 business days. Anything else?
++
++Key behaviors shown:
++- Ask for identifying info in a single step, not across multiple turns.
++- Look up the record, then present ALL relevant details in ONE confirmation message.
++- Require exactly ONE explicit confirmation before executing.
++- After a "yes", call the tool and report the result — do NOT re-summarize or re-confirm.
++- Do not repeat back the same summary multiple times; avoid redundant confirmation turns.
