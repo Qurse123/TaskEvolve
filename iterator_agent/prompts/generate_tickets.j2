@@ -48,9 +48,11 @@ was ACCEPTED:
 {% endfor %}
 {% endif %}
 
-Cost is driven by turns, tool calls, verbose context, and model choice. The only models
-available to the task agent are gpt-4.1 and gpt-4.1-mini (a ~5x cheaper, near-capability
-sibling) — no other model exists in this environment. Do NOT propose task-ID-specific
+Cost is driven by turns, tool calls, verbose context, and model choice. The models
+available to the task agent are anthropic/claude-opus-4-8 (strongest, $5/$25 per 1M),
+anthropic/claude-sonnet-5 (mid, $2/$10), and anthropic/claude-haiku-4-5 (cheapest,
+$1/$5); model_routing.get_model sees the conversation history so it can route per
+turn — no other model exists here. Do NOT propose task-ID-specific
 hacks or anything that reads validation/test data.
 
 Respond with ONLY a JSON array (no prose, no markdown fences) of exactly {{ n }} tickets,

@@ -25,7 +25,13 @@ import sys
 from pathlib import Path
 
 # The editor may only route the agent to these models (see prompts/*.j2).
-ALLOWED_AGENT_MODELS = ("gpt-4.1", "gpt-4.1-mini")
+# Exp 2 cost-aware routing over the Anthropic pool: Opus 4.8 ($5/$25 per 1M,
+# strongest), Sonnet 5 ($2/$10, mid), Haiku 4.5 ($1/$5, cheapest/fastest).
+ALLOWED_AGENT_MODELS = (
+    "anthropic/claude-opus-4-8",
+    "anthropic/claude-sonnet-5",
+    "anthropic/claude-haiku-4-5",
+)
 
 PYTHON_SURFACES = (
     "target_agent/harness.py",
@@ -122,17 +128,22 @@ def _check_model_routing() -> None:
 
     if not callable(getattr(routing, "get_model", None)):
         raise RuntimeError("target_agent/model_routing.py must define get_model()")
-    try:
-        model = routing.get_model("gpt-4.1")  # the exact call agent.py makes
-    except Exception as exc:
-        raise RuntimeError(
-            f"model_routing get_model crashed: {type(exc).__name__}: {exc}"
-        ) from exc
-    if model not in ALLOWED_AGENT_MODELS:
-        raise RuntimeError(
-            f"model_routing returned disallowed model {model!r}; "
-            f"allowed: {', '.join(ALLOWED_AGENT_MODELS)}"
-        )
+    configured = ALLOWED_AGENT_MODELS[0]
+    # Exercise the exact call agent.py makes — get_model(configured, history) —
+    # across the contexts a routing policy might branch on (empty + multi-turn),
+    # so a policy that returns an off-pool model on some turn is caught at $0.
+    for history in ([], _synthetic_history()):
+        try:
+            model = routing.get_model(configured, history)
+        except Exception as exc:
+            raise RuntimeError(
+                f"model_routing get_model crashed: {type(exc).__name__}: {exc}"
+            ) from exc
+        if model not in ALLOWED_AGENT_MODELS:
+            raise RuntimeError(
+                f"model_routing returned disallowed model {model!r}; "
+                f"allowed: {', '.join(ALLOWED_AGENT_MODELS)}"
+            )
 
 
 def _check_templates(root: Path) -> None:

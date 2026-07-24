@@ -86,7 +86,11 @@ class TaskEvolveAgent(LLMAgent):
 
         messages = build_messages(state.system_messages, state.messages)
         tools = filter_tools(self.tools)
-        model = get_model(self.llm)
+        # Pass the conversation so far (read-only) so a routing policy in
+        # model_routing.get_model can branch on context (Exp 2 cost-aware routing).
+        # The identity default ignores it, so this is behavior-preserving for
+        # every non-routing arm.
+        model = get_model(self.llm, state.messages)
 
         result = generate(
             model=model,

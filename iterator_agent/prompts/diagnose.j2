@@ -42,8 +42,11 @@ what was ACCEPTED:
 The objective is to REDUCE the MEAN COST PER TASK while keeping task success at or
 above its current level (success is a hard floor — a cheaper change that drops
 success will be rejected). Cost is driven by turns, tool calls, and model choice.
-The only models available to the task agent are gpt-4.1 and gpt-4.1-mini (a ~5x
-cheaper, near-capability sibling) — no other model exists in this environment.
+The models available to the task agent are anthropic/claude-opus-4-8 (strongest,
+$5/$25 per 1M), anthropic/claude-sonnet-5 (mid, $2/$10), and
+anthropic/claude-haiku-4-5 (cheapest, $1/$5) — no other model exists here.
+model_routing.get_model(configured_model, history) receives the conversation so
+far, so it can route per turn (cheap model on simple turns, strong on hard ones).
 Using the cost table and the transcripts above, analyze in 3-5 concise bullet
 points where cost is being wasted (redundant turns or tool calls, verbose context,
 an over-powered model on easy turns, avoidable failures) and which harness lever

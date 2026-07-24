@@ -88,6 +88,24 @@ def test_disallowed_model_fails(tmp_path: Path) -> None:
     assert "model" in result.reason.lower()
 
 
+def test_routing_off_pool_on_later_turn_fails(tmp_path: Path) -> None:
+    # Exp 2: get_model is exercised with a multi-turn history too, so a policy that
+    # returns an off-pool model only on later turns is still caught at $0.
+    root = _candidate_tree(tmp_path)
+    (root / "target_agent" / "model_routing.py").write_text(
+        "def get_model(configured_model, history=None):\n"
+        "    if history:\n"
+        "        return 'gpt-4o'  # off-pool once the conversation has turns\n"
+        "    return configured_model\n",
+        encoding="utf-8",
+    )
+
+    result = run_preflight(root, "target_agent/model_routing.py")
+
+    assert result.passed is False
+    assert "model" in result.reason.lower()
+
+
 def test_broken_template_fails(tmp_path: Path) -> None:
     # StrictUndefined: a template referencing an undefined variable must fail.
     root = _candidate_tree(tmp_path)

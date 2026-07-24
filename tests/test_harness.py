@@ -36,3 +36,10 @@ def test_get_model_is_identity() -> None:
     # v0.1: no cheap-model routing; the configured (open-weight) model is used as-is.
     assert get_model("together_ai/thinkingmachines/Inkling") == "together_ai/thinkingmachines/Inkling"
     assert get_model("gpt-4.1") == "gpt-4.1"
+
+
+def test_get_model_accepts_and_ignores_history() -> None:
+    # Exp 2: get_model now receives conversation history so a routing policy can
+    # branch on it. The identity baseline accepts but ignores it (behavior-preserving).
+    assert get_model("anthropic/claude-opus-4-8", []) == "anthropic/claude-opus-4-8"
+    assert get_model("anthropic/claude-opus-4-8", ["u1", "a1", "u2"]) == "anthropic/claude-opus-4-8"
