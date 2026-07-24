@@ -1,52 +1,14 @@
---- a/target_agent/harness.py
-+++ b/target_agent/harness.py
-@@ -7,7 +7,8 @@
- 
- from __future__ import annotations
- 
--from typing import Sequence
-+from typing import Sequence, List
-+from dataclasses import replace
- 
- from tau2.data_model.message import Message, SystemMessage
- from tau2.environment.tool import Tool
-@@ -30,10 +31,35 @@
-     return list(history)
- 
- 
--def filter_tools(tools: list[Tool]) -> list[Tool]:
-+def _first_sentence(text: str) -> str:
-+    """Return the first sentence (trimmed) from the input text."""
-+    sent = text.split(".")[0].strip()
-+    return sent + "." if not sent.endswith(".") else sent
-+
-+
-+def filter_tools(tools: List[Tool]) -> List[Tool]:
-     """Return the tool list to expose to the LLM.
- 
--    M1: pass-through — all tools exposed unchanged.
--    Iterator can narrow the set or rewrite descriptions here.
-+    M3 (ticket t5): shorten each tool description to its first sentence to cut
-+    tokens while leaving the JSON schema and functionality intact.
-     """
--    return list(tools)
-+    shortened: List[Tool] = []
-+    for t in tools:
-+        # Only attempt to shorten if a non-empty description attribute exists.
-+        desc = getattr(t, "description", None)
-+        if isinstance(desc, str) and desc:
-+            short_desc = _first_sentence(desc)
-+            # dataclasses.replace preserves all fields except those we change.
-+            try:
-+                t_shrunk = replace(t, description=short_desc)
-+            except TypeError:
-+                # Fallback: mutate directly if replace fails (e.g., not frozen).
-+                try:
-+                    t.description = short_desc  # type: ignore[attr-defined]
-+                except Exception:
-+                    pass  # If mutation fails, leave as-is.
-+                t_shrunk = t
-+        else:
-+            t_shrunk = t
-+        shortened.append(t_shrunk)
-+    return shortened
+--- a/target_agent/prompts/policy_summary.j2
++++ b/target_agent/prompts/policy_summary.j2
+@@ -1 +1,10 @@
+-{{ domain_policy }}
++{% set lines = domain_policy.split('\n') %}
++{%- for line in lines -%}
++{%- set stripped = line.strip() -%}
++{%- if stripped -%}
++{%- set low = stripped.lower() -%}
++{%- if low.startswith('you must') or low.startswith('you should') or low.startswith('always') or low.startswith('never') or low.startswith('do not') or low.startswith('don\'t') or low.startswith('must') or low.startswith('cannot') or low.startswith('can not') or ' must ' in low or ' must not ' in low or ' may not ' in low or ' are not allowed' in low or 'is not allowed' in low or 'are required' in low or 'is required' in low or 'only if' in low or 'unless' in low or low.startswith('- ') or low.startswith('* ') or (stripped[0] is defined and stripped[0].isdigit()) -%}
++{{ stripped }}
++{% endif -%}
++{%- endif -%}
++{%- endfor -%}

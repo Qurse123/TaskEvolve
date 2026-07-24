@@ -1,1 +1,2 @@
 - **iter_0004** (v0.2) `target_agent/harness.py` — Skip re-sending system messages after the first turn to save tokens. _accepted: all 2 proxy runs improved mean cost per task within guardrails_
+- **iter_0009** (v0.2) `target_agent/prompts/policy_summary.j2` — Trim policy_summary to only enforced/rule-bearing lines using pure Jinja string ops (no regex_replace filter). _accepted: all 2 proxy runs improved mean cost per task within guardrails_

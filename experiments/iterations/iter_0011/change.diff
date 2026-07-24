@@ -1,97 +1,19 @@
---- a/target_agent/harness.py
-+++ b/target_agent/harness.py
-@@ -7,11 +7,68 @@
+--- a/target_agent/prompts/system_prompt.j2
++++ b/target_agent/prompts/system_prompt.j2
+@@ -6,6 +6,16 @@
+ You cannot do both at the same time.
  
- from __future__ import annotations
- 
--from typing import Sequence
-+from typing import Sequence, List
- 
- from tau2.data_model.message import Message, SystemMessage
- from tau2.environment.tool import Tool
- 
-+# --- Sliding-window parameters ---
-+# Approximate maximum tokens from prior turns we want to keep in context.
-+_MAX_HISTORY_TOKENS = 1500
+ Try to be helpful and always follow the policy. Always make sure you generate valid JSON only.
 +
-+
-+def _approx_token_count(text: str | None) -> int:
-+    """Very light-weight token estimator.
-+
-+    We do NOT import heavy tokenizers at runtime; a simple word split keeps the
-+    codebase lightweight and still gives us a useful proxy. One safety guard is
-+    better than none, and slight over/under counts are okay for our purpose of
-+    *roughly* bounding history size.
-+    """
-+    if not text:
-+        return 0
-+    # OpenAI tokens average ~¾ word; using words is a conservative estimate.
-+    return len(text.split())
-+
-+
-+def _estimate_message_tokens(msg: Message) -> int:
-+    """Return a rough token count for an individual Message object."""
-+    # Most Message subclasses expose a ``content`` string.  If that is missing
-+    # (e.g. for tool calls encoded as Messages with arguments only), we fall
-+    # back to 0 – such messages are typically short JSON dicts that will not
-+    # blow up the context size.
-+    return _approx_token_count(getattr(msg, "content", None))
-+
-+
-+def _trim_history(history: Sequence[Message], max_tokens: int = _MAX_HISTORY_TOKENS) -> List[Message]:
-+    """Return the most-recent slice of *history* whose estimated size ≤ max_tokens.
-+
-+    We walk the history backwards so that we always retain the *latest* turns –
-+    exactly what matters for coherence – and drop only the oldest ones.  Each
-+    item is a proper ``Message`` instance, so we never lose required ``role``
-+    fields (the root cause of the earlier crash referenced in ticket t2).
-+    """
-+    if not history:
-+        return []
-+
-+    kept: List[Message] = []
-+    running_total = 0
-+
-+    for msg in reversed(history):  # newest → oldest
-+        token_estimate = _estimate_message_tokens(msg)
-+        running_total += token_estimate
-+        kept.append(msg)
-+        if running_total >= max_tokens:
-+            break  # We have enough recent context; older turns can be dropped.
-+
-+    # Reverse again to restore chronological order.
-+    kept.reverse()
-+    return kept
-+
-+
-+# ---------------------------------------------------------------------------
-+# Public helpers
-+# ---------------------------------------------------------------------------
- 
- def build_messages(
-     system_messages: list[SystemMessage],
-@@ -20,14 +77,20 @@
-     """Return the full message list to pass to generate().
- 
-     M2 tweak (ticket t4): only include the verbose system messages on the very
--    first generation call. After the first turn, the model already has those
-+    first generation call.  After the first turn, the model already has those
-     instructions in context, so re-sending them wastes tokens.
-+
-+    NEW (ticket t2): apply a sliding-window over *history* so that we keep only
-+    the most recent ~1500 tokens, cutting context bloat on very long chains
-+    while safeguarding against malformed messages.
-     """
--    # If this is the first turn (no prior user/assistant messages), include
--    # the system prompts; otherwise omit them to save tokens.
-+    # First turn → include system prompts in full.
-     if len(history) == 0:
-         return [*system_messages]
--    return list(history)
-+
-+    # Subsequent turns → omit system messages and trim dialog history.
-+    trimmed_history = _trim_history(history, _MAX_HISTORY_TOKENS)
-+    return trimmed_history
- 
- 
- def filter_tools(tools: list[Tool]) -> list[Tool]:
++<efficiency_guidelines>
++Before fetching order or product details, disambiguate the target from what the user has told you:
++- If the user mentions specific items, an order date, an order number, or other identifying details, use those to identify the single relevant order before calling get_order_details.
++- Do NOT call get_order_details for every order on an account. Only fetch details for the order(s) that plausibly match the user's stated request.
++- If multiple orders could match and you cannot narrow it down, ask the user a brief clarifying question (e.g., which item or approximate date) rather than fetching all orders' details.
++- Similarly, only call get_product_details for products that are actually relevant to the current task, not for every product in an order.
++- Once you have the information needed to act, proceed; avoid redundant lookups that do not change your next action.
++These guidelines are about avoiding unnecessary tool calls only. Never skip a lookup that is required to correctly and safely complete the task per the policy.
++</efficiency_guidelines>
+ </instructions>
+ <policy>
+ {{ domain_policy }}
