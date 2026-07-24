@@ -1,0 +1,28 @@
+{
+  "iteration_id": "iter_0012",
+  "timestamp": "2026-07-24T06:21:24.817591+00:00",
+  "harness_version": "v0.1",
+  "changed_surface": "system_prompt",
+  "changed_file": "target_agent/prompts/system_prompt.j2",
+  "change_summary": "Add tool-efficiency guidance to reuse fetched order data, parallelize independent lookups, and deduplicate product/order calls.",
+  "reason_for_change": "get_order_details and get_product_details dominate tool usage; order payloads already contain item_ids/details, so instructing the agent to reuse fetched data, avoid redundant product lookups, and parallelize independent calls should reduce mean tool_calls and cost per task while preserving correctness (efficiency explicitly subordinated to policy/success).",
+  "proxy_seeds": [
+    4045
+  ],
+  "proxy_task_success_before_mean": 0.76666,
+  "proxy_task_success_before_std": 0.03725289250514652,
+  "proxy_task_success_after_mean": 0.75,
+  "proxy_task_success_after_std": 0.0,
+  "cost_per_successful_task_before": 0.7579022,
+  "cost_per_successful_task_after": 0.8392472222222223,
+  "accepted_or_rejected": "rejected",
+  "reason_accepted_or_rejected": "rejected: first proxy run did not improve \u2014 no cost improvement beyond noise: per-task cost 0.629435 >= threshold 0.549781 (best mean 0.580574 - 1\u03c3\u00b70.030793)",
+  "iterator_search_cost_usd": 0.021795,
+  "notes": "",
+  "editor_model": "anthropic/claude-opus-4-8",
+  "agent_model": "anthropic/claude-opus-4-8",
+  "cost_per_task_before": 0.5805739999999999,
+  "cost_per_task_after": 0.6294354166666667,
+  "ticket_id": "t2",
+  "hypothesis": "The agent re-fetches product details it could infer or already partially has, and issues one get_product_details per item serially; instructing it to parallelize/deduplicate lookups already present in fetched order data reduces tool calls."
+}

@@ -1,21 +1,19 @@
---- a/target_agent/harness.py
-+++ b/target_agent/harness.py
-@@ -19,10 +19,15 @@
- ) -> list[Message]:
-     """Return the full message list to pass to generate().
+--- a/target_agent/prompts/system_prompt.j2
++++ b/target_agent/prompts/system_prompt.j2
+@@ -6,6 +6,16 @@
+ You cannot do both at the same time.
  
--    M1: pass-through — system + history with no compression. This is the frozen
--    Arm A baseline; the iterator may add sliding-window or summary compression here.
-+    M2 tweak (ticket t4): only include the verbose system messages on the very
-+    first generation call. After the first turn, the model already has those
-+    instructions in context, so re-sending them wastes tokens.
-     """
--    return [*system_messages, *history]
-+    # If this is the first turn (no prior user/assistant messages), include
-+    # the system prompts; otherwise omit them to save tokens.
-+    if len(history) == 0:
-+        return [*system_messages]
-+    return list(history)
- 
- 
- def filter_tools(tools: list[Tool]) -> list[Tool]:
+ Try to be helpful and always follow the policy. Always make sure you generate valid JSON only.
++
++<response_style>
++Keep all messages to the user terse and plain. Specifically:
++- Do NOT use emojis.
++- Do NOT use markdown tables, headers, or decorative formatting.
++- Avoid multi-bullet summaries and repeated confirmations; state only what is necessary to move the task forward.
++- Prefer one or two short sentences per turn. Only include details the user actually needs.
++- Do not restate information you already provided unless the user asks.
++This style affects only the wording of your user-facing messages. It does NOT change which tool calls you make or the policy steps you follow.
++</response_style>
+ </instructions>
+ <policy>
+ {{ domain_policy }}

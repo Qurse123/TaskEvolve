@@ -1,46 +1,25 @@
---- a/target_agent/harness.py
-+++ b/target_agent/harness.py
-@@ -12,6 +12,21 @@
- from tau2.data_model.message import Message, SystemMessage
- from tau2.environment.tool import Tool
- 
-+# Keep at most this many user/assistant exchanges (pair of messages) in context
-+_MAX_EXCHANGES_TO_KEEP = 10  # 10 exchanges ≈ 20 messages
+--- a/target_agent/prompts/few_shot_examples.j2
++++ b/target_agent/prompts/few_shot_examples.j2
+@@ -1 +1,21 @@
+-{# Empty in Milestone 1 — iterator may populate with example conversations in M2+. #}
++{# Compact few-shot example demonstrating an efficient verify->lookup->confirm->execute flow. #}
++{% if example_conversations %}
++Here is an example of an efficient interaction. Follow this pattern: gather all required identifiers up front, verify identity once, look up the relevant records, confirm the action succinctly, then execute. Avoid redundant re-confirmation and repeated identity lookups.
 +
++---
++User: I need to cancel my order.
++Assistant: I can help with that. To locate your order, please share your email (or account ID) and the order number.
++User: jane.doe@example.com, order #A1029.
++Assistant: [verify_identity(email="jane.doe@example.com")] -> verified
++[lookup_order(order_id="A1029")] -> status: processing, total: $84.20, cancelable: yes
++Your order A1029 ($84.20, still processing) is eligible for cancellation. I'll cancel it now.
++[cancel_order(order_id="A1029")] -> success
++Done — order A1029 has been canceled and a refund of $84.20 will be issued to your original payment method. Anything else?
++---
 +
-+def _trim_history(history: Sequence[Message]) -> list[Message]:
-+    """Return the most recent portion of history, capped by _MAX_EXCHANGES_TO_KEEP.
-+
-+    One *exchange* is a user→assistant pair, so we keep 2×N messages.
-+    This sliding-window is a simple, safe way to bound context length.
-+    """
-+    max_msgs = _MAX_EXCHANGES_TO_KEEP * 2  # user + assistant per exchange
-+    if len(history) <= max_msgs:
-+        return list(history)
-+    return list(history[-max_msgs:])
-+
- 
- def build_messages(
-     system_messages: list[SystemMessage],
-@@ -22,12 +37,18 @@
-     M2 tweak (ticket t4): only include the verbose system messages on the very
-     first generation call. After the first turn, the model already has those
-     instructions in context, so re-sending them wastes tokens.
-+
-+    New (ticket t1): after the first turn, keep only the most recent
-+    `_MAX_EXCHANGES_TO_KEEP` user/assistant exchanges to cap token cost on
-+    long dialogues without hurting task recall.
-     """
--    # If this is the first turn (no prior user/assistant messages), include
--    # the system prompts; otherwise omit them to save tokens.
-+    # First turn: include system prompts verbatim.
-     if len(history) == 0:
-         return [*system_messages]
--    return list(history)
-+
-+    # Subsequent turns: trim older messages to save tokens.
-+    trimmed_history = _trim_history(history)
-+    return trimmed_history
- 
- 
- def filter_tools(tools: list[Tool]) -> list[Tool]:
++Key points from this example:
++- Ask for all needed identifiers in a single message.
++- Verify identity exactly once; reuse that verification for subsequent lookups.
++- State what you found and what you will do together, then execute without asking for repeated confirmation on details already provided.
++- Keep responses concise to minimize turns.
++{% endif %}

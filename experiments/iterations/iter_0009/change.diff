@@ -1,52 +1,29 @@
---- a/target_agent/harness.py
-+++ b/target_agent/harness.py
-@@ -7,7 +7,8 @@
- 
- from __future__ import annotations
- 
--from typing import Sequence
-+from typing import Sequence, List
-+from dataclasses import replace
- 
- from tau2.data_model.message import Message, SystemMessage
- from tau2.environment.tool import Tool
-@@ -30,10 +31,35 @@
-     return list(history)
- 
- 
--def filter_tools(tools: list[Tool]) -> list[Tool]:
-+def _first_sentence(text: str) -> str:
-+    """Return the first sentence (trimmed) from the input text."""
-+    sent = text.split(".")[0].strip()
-+    return sent + "." if not sent.endswith(".") else sent
+--- a/target_agent/prompts/few_shot_examples.j2
++++ b/target_agent/prompts/few_shot_examples.j2
+@@ -1 +1,25 @@
+-{# Empty in Milestone 1 — iterator may populate with example conversations in M2+. #}
++{# Few-shot exemplar teaching an efficient verify -> batch-lookup -> confirm -> execute flow.
++   Self-contained: does NOT reference the undefined `example_conversations` variable,
++   so it renders safely even when the caller guards the examples block. #}
++### Example: efficient order-handling flow
 +
++Follow this compact sequence to minimize turns and redundant tool calls:
++1. Verify identity ONCE (collect email + order id together; do not re-ask).
++2. Batch your lookups: fetch everything you need in as few calls as possible.
++3. Confirm the intended action with the user in a single message.
++4. Execute, then report the result.
 +
-+def filter_tools(tools: List[Tool]) -> List[Tool]:
-     """Return the tool list to expose to the LLM.
- 
--    M1: pass-through — all tools exposed unchanged.
--    Iterator can narrow the set or rewrite descriptions here.
-+    M3 (ticket t5): shorten each tool description to its first sentence to cut
-+    tokens while leaving the JSON schema and functionality intact.
-     """
--    return list(tools)
-+    shortened: List[Tool] = []
-+    for t in tools:
-+        # Only attempt to shorten if a non-empty description attribute exists.
-+        desc = getattr(t, "description", None)
-+        if isinstance(desc, str) and desc:
-+            short_desc = _first_sentence(desc)
-+            # dataclasses.replace preserves all fields except those we change.
-+            try:
-+                t_shrunk = replace(t, description=short_desc)
-+            except TypeError:
-+                # Fallback: mutate directly if replace fails (e.g., not frozen).
-+                try:
-+                    t.description = short_desc  # type: ignore[attr-defined]
-+                except Exception:
-+                    pass  # If mutation fails, leave as-is.
-+                t_shrunk = t
-+        else:
-+            t_shrunk = t
-+        shortened.append(t_shrunk)
-+    return shortened
++User: Hi, I need to change the shipping address on my recent order.
++Assistant: I can help. To verify your account, please share the email on the order and the order ID.
++User: jordan@example.com, order #A1042.
++Assistant: (verify_identity email="jordan@example.com" order_id="A1042")
++Assistant: (get_order order_id="A1042")  # single targeted lookup — no extra product/order fetches
++Assistant: I found order #A1042 (2 items, not yet shipped). What is the new shipping address, and shall I update it?
++User: 55 Oak St, Denver, CO 80203. Yes, update it.
++Assistant: (update_shipping_address order_id="A1042" address="55 Oak St, Denver, CO 80203")
++Assistant: Done — order #A1042 will now ship to 55 Oak St, Denver, CO 80203. Anything else?
++
++Key rules:
++- Do NOT repeat identity verification once it has succeeded.
++- Do NOT fetch orders or products you were not asked about; look up only what the task requires.
++- Prefer one confirmation message over multiple clarifying round-trips.

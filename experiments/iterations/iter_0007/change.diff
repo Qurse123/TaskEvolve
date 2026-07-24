@@ -1,73 +1,101 @@
---- a/target_agent/model_routing.py
-+++ b/target_agent/model_routing.py
-@@ -1,20 +1,61 @@
- """Model selection for TaskEvolveAgent.
+--- a/target_agent/harness.py
++++ b/target_agent/harness.py
+@@ -9,8 +9,76 @@
  
--The iterator (Milestone 2+) may modify this file to add:
--- Cheap/strong routing based on turn count or confidence
--- Per-task-type model selection
-+Routing logic:
-+1. The very first assistant turn (no history yet) is sent to the cheap model –
-+   this already existed.
-+2. We additionally detect the common tool-call pattern `tool → assistant → user`.
-+   When the conversation ends with that sequence, the upcoming assistant turn
-+   is almost always a *pure* JSON tool call.  Those mechanical calls can be
-+   safely handled by the cheaper `gpt-4.1-mini` while all reasoning-heavy
-+   turns (including the assistant response to the tool output) stay on the
-+   stronger `gpt-4.1` model.
-+
-+Only the allowed model names are used.
- """
+ from typing import Sequence
  
- from __future__ import annotations
-+from typing import List, Dict, Any
+-from tau2.data_model.message import Message, SystemMessage
++from tau2.data_model.message import (
++    Message,
++    SystemMessage,
++    ToolMessage,
++)
+ from tau2.environment.tool import Tool
 +
-+Message = Dict[str, Any]
- 
- 
--def get_model(configured_model: str, history=None) -> str:
--    """Return the model to use for the current generation call.
-+def _looks_like_upcoming_tool_call(history: List[Message]) -> bool:
-+    """Heuristic: conversation ends with TOOL → ASSISTANT → USER.
- 
--    Routes to gpt-4.1-mini if there is no conversation history (i.e., first turn),
--    otherwise uses the configured model. This sends simple, tool-free, single-turn tasks
--    to the cheaper model by default.
-+    Pattern: *tool executes*  ➜  assistant interprets tool output  ➜  user
-+    asks for the next step.  The assistant's *next* turn is very likely to be
-+    another bare JSON tool invocation.
-     """
--    if history is not None and len(history) == 0:
-+    if len(history) < 3:
-+        return False
++# Keep the most recent N tool results in full; older tool-result payloads are
++# compressed to a short stub. This preserves the *decisions* (assistant/user
++# turns and recent tool outputs the model is actively reasoning over) while
++# dropping stale, bulky JSON blobs (e.g. repeated get_order_details objects)
++# that would otherwise be resent verbatim on every subsequent turn.
++_KEEP_RECENT_TOOL_RESULTS = 4
 +
-+    last, prev, prior = history[-1], history[-2], history[-3]
++# Only bother compressing payloads above this character budget; small results
++# are cheap and stubbing them adds no value.
++_MIN_PAYLOAD_CHARS = 200
 +
-+    return (
-+        last.get("role") == "user"
-+        and prev.get("role") == "assistant"
-+        and prior.get("role") == "tool"
-+    )
++_STUB_TEMPLATE = (
++    "[tool result elided to save context; "
++    "{n} chars of prior output for this call omitted]"
++)
 +
 +
-+def get_model(configured_model: str, history: List[Message] | None = None) -> str:
-+    """Return the model name for the current generation call.
++def _tool_result_len(msg: ToolMessage) -> int:
++    content = getattr(msg, "content", None)
++    if isinstance(content, str):
++        return len(content)
++    if content is None:
++        return 0
++    return len(str(content))
 +
-+    - First turn (no history) ➜ gpt-4.1-mini
-+    - If heuristic predicts a pure tool call (`tool → assistant → user`) ➜ gpt-4.1-mini
-+    - Otherwise use the configured (strong) model.
++
++def _compress_history(history: Sequence[Message]) -> list[Message]:
++    """Drop stale tool-result payloads while keeping all decisions.
++
++    Strategy:
++    - Identify indices of ToolMessages in order.
++    - Keep the last ``_KEEP_RECENT_TOOL_RESULTS`` tool results untouched.
++    - For older tool results whose payload exceeds ``_MIN_PAYLOAD_CHARS``,
++      replace the content with a compact stub. All non-tool messages
++      (system/assistant/user), tool_call metadata, ids, and ordering are
++      preserved verbatim so the conversation's decision trail is intact.
 +    """
-+    # No special routing if history is missing.
-+    if history is None:
-+        return configured_model
++    tool_indices = [
++        i for i, m in enumerate(history) if isinstance(m, ToolMessage)
++    ]
++    if len(tool_indices) <= _KEEP_RECENT_TOOL_RESULTS:
++        return list(history)
 +
-+    # First assistant turn of the task.
-+    if len(history) == 0:
-         return "gpt-4.1-mini"
++    # Indices whose payloads are eligible to be stubbed (all but the most recent).
++    stub_targets = set(tool_indices[:-_KEEP_RECENT_TOOL_RESULTS])
 +
-+    # Pure-action step heuristic.
-+    if _looks_like_upcoming_tool_call(history):
-+        return "gpt-4.1-mini"
-+
-+    # Default: strong model for reasoning turns.
-     return configured_model
++    out: list[Message] = []
++    for i, msg in enumerate(history):
++        if i in stub_targets and isinstance(msg, ToolMessage):
++            n = _tool_result_len(msg)
++            if n >= _MIN_PAYLOAD_CHARS:
++                try:
++                    stub = msg.model_copy(
++                        update={"content": _STUB_TEMPLATE.format(n=n)}
++                    )
++                    out.append(stub)
++                    continue
++                except Exception:
++                    # If copy/update fails for any reason, fall back to
++                    # passing the original message through unchanged.
++                    pass
++        out.append(msg)
++    return out
+ 
+ 
+ def build_messages(
+@@ -19,12 +87,15 @@
+ ) -> list[Message]:
+     """Return the full message list to pass to generate().
+ 
+-    Static Arm A v0.1 harness: pass-through — system + history with no
+-    compression, so the system prompt/policy is present on every turn. This is
+-    the frozen baseline the open-weight arms (C/D) run against; the Arm B iterator
+-    variant (v0.2, drop-system-after-turn-1) lives on its own branch.
++    History-compression harness: system + compressed history. The system
++    prompt/policy is still present on every turn (decisions preserved), but
++    stale tool-result payloads beyond the most recent few are stubbed so large
++    JSON blobs are not resent verbatim on every subsequent turn. This targets
++    the quadratic input-token growth on long/high-turn tasks while keeping the
++    decision trail intact.
+     """
+-    return [*system_messages, *history]
++    compressed = _compress_history(history)
++    return [*system_messages, *compressed]
+ 
+ 
+ def filter_tools(tools: list[Tool]) -> list[Tool]:

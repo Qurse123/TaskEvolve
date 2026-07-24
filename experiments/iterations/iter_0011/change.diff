@@ -1,97 +1,17 @@
---- a/target_agent/harness.py
-+++ b/target_agent/harness.py
-@@ -7,11 +7,68 @@
+--- a/target_agent/prompts/system_prompt.j2
++++ b/target_agent/prompts/system_prompt.j2
+@@ -6,6 +6,14 @@
+ You cannot do both at the same time.
  
- from __future__ import annotations
- 
--from typing import Sequence
-+from typing import Sequence, List
- 
- from tau2.data_model.message import Message, SystemMessage
- from tau2.environment.tool import Tool
- 
-+# --- Sliding-window parameters ---
-+# Approximate maximum tokens from prior turns we want to keep in context.
-+_MAX_HISTORY_TOKENS = 1500
+ Try to be helpful and always follow the policy. Always make sure you generate valid JSON only.
 +
-+
-+def _approx_token_count(text: str | None) -> int:
-+    """Very light-weight token estimator.
-+
-+    We do NOT import heavy tokenizers at runtime; a simple word split keeps the
-+    codebase lightweight and still gives us a useful proxy. One safety guard is
-+    better than none, and slight over/under counts are okay for our purpose of
-+    *roughly* bounding history size.
-+    """
-+    if not text:
-+        return 0
-+    # OpenAI tokens average ~¾ word; using words is a conservative estimate.
-+    return len(text.split())
-+
-+
-+def _estimate_message_tokens(msg: Message) -> int:
-+    """Return a rough token count for an individual Message object."""
-+    # Most Message subclasses expose a ``content`` string.  If that is missing
-+    # (e.g. for tool calls encoded as Messages with arguments only), we fall
-+    # back to 0 – such messages are typically short JSON dicts that will not
-+    # blow up the context size.
-+    return _approx_token_count(getattr(msg, "content", None))
-+
-+
-+def _trim_history(history: Sequence[Message], max_tokens: int = _MAX_HISTORY_TOKENS) -> List[Message]:
-+    """Return the most-recent slice of *history* whose estimated size ≤ max_tokens.
-+
-+    We walk the history backwards so that we always retain the *latest* turns –
-+    exactly what matters for coherence – and drop only the oldest ones.  Each
-+    item is a proper ``Message`` instance, so we never lose required ``role``
-+    fields (the root cause of the earlier crash referenced in ticket t2).
-+    """
-+    if not history:
-+        return []
-+
-+    kept: List[Message] = []
-+    running_total = 0
-+
-+    for msg in reversed(history):  # newest → oldest
-+        token_estimate = _estimate_message_tokens(msg)
-+        running_total += token_estimate
-+        kept.append(msg)
-+        if running_total >= max_tokens:
-+            break  # We have enough recent context; older turns can be dropped.
-+
-+    # Reverse again to restore chronological order.
-+    kept.reverse()
-+    return kept
-+
-+
-+# ---------------------------------------------------------------------------
-+# Public helpers
-+# ---------------------------------------------------------------------------
- 
- def build_messages(
-     system_messages: list[SystemMessage],
-@@ -20,14 +77,20 @@
-     """Return the full message list to pass to generate().
- 
-     M2 tweak (ticket t4): only include the verbose system messages on the very
--    first generation call. After the first turn, the model already has those
-+    first generation call.  After the first turn, the model already has those
-     instructions in context, so re-sending them wastes tokens.
-+
-+    NEW (ticket t2): apply a sliding-window over *history* so that we keep only
-+    the most recent ~1500 tokens, cutting context bloat on very long chains
-+    while safeguarding against malformed messages.
-     """
--    # If this is the first turn (no prior user/assistant messages), include
--    # the system prompts; otherwise omit them to save tokens.
-+    # First turn → include system prompts in full.
-     if len(history) == 0:
-         return [*system_messages]
--    return list(history)
-+
-+    # Subsequent turns → omit system messages and trim dialog history.
-+    trimmed_history = _trim_history(history, _MAX_HISTORY_TOKENS)
-+    return trimmed_history
- 
- 
- def filter_tools(tools: list[Tool]) -> list[Tool]:
++<efficiency>
++When a user's request involves multiple items or actions (for example, adding several items, updating multiple fields, or processing a list of things), do NOT handle them one at a time with a separate confirm -> tool -> summary round-trip for each item. Instead:
++- Gather the full set of items/actions the user wants.
++- Present a SINGLE consolidated confirmation that lists all the items/actions together.
++- After the user confirms once, execute the required tool calls for all items, then give ONE concise summary covering everything.
++Still confirm before executing any action that requires confirmation per the policy, but batch that confirmation across all known items rather than repeating it per item. Keep summaries brief and avoid restating information the user already has. Only fall back to per-item handling when the policy explicitly requires separate confirmation for a specific action.
++</efficiency>
+ </instructions>
+ <policy>
+ {{ domain_policy }}

@@ -1,16 +1,31 @@
---- a/target_agent/prompts/few_shot_examples.j2
-+++ b/target_agent/prompts/few_shot_examples.j2
-@@ -1 +1,12 @@
--{# Empty in Milestone 1 — iterator may populate with example conversations in M2+. #}
-+{# Few-shot example: assistant asks for every needed identifier in ONE clarification message, teaching the pattern to reduce turns #}
-+User: Add a new method `send_email` to the class `NotificationService` in `services/notify.py` of the `acme_mailer` repo. The method should accept `recipient`, `subject`, and `body` strings and send the email via SMTP.
-+Assistant: Certainly! To keep this efficient, please confirm all key details in a single message:
-+1. Repository name (acme_mailer) – confirmed
-+2. File path (services/notify.py) – confirmed
-+3. Target class (NotificationService) – confirmed
-+4. Desired method signature: send_email(recipient: str, subject: str, body: str) -> None
-+5. Preferred libraries or constraints (e.g., use built-in smtplib only)
-+6. Any docstring or unit-test requirements
-+Provide/confirm everything above together and I’ll implement immediately.
-+User: Use only smtplib, include a concise docstring, and no tests are required—everything else is correct.
-+Assistant: Great, details locked. Implementing now…
+--- a/target_agent/harness.py
++++ b/target_agent/harness.py
+@@ -27,10 +27,25 @@
+     return [*system_messages, *history]
+ 
+ 
++# Tools that are near-unused in the retail task distribution (t3 hypothesis):
++# transfer_to_human_agents (1 call observed) and calculate (2 calls observed).
++# Their schemas are resent every turn (~28.5 turns/task), adding fixed per-turn
++# input-token overhead without meaningfully expanding the used action space.
++_RARELY_USED_TOOLS = frozenset({
++    "transfer_to_human_agents",
++    "calculate",
++})
++
++
+ def filter_tools(tools: list[Tool]) -> list[Tool]:
+     """Return the tool list to expose to the LLM.
+ 
+-    M1: pass-through — all tools exposed unchanged.
+-    Iterator can narrow the set or rewrite descriptions here.
++    t3: drop the rarely/never-used tools from the exposed set so their schemas
++    are not resent on every turn. This trims fixed per-turn tool-schema tokens
++    while leaving the retail-relevant action space the agent actually uses
++    intact. Falls back to pass-through if filtering would remove everything.
+     """
+-    return list(tools)
++    filtered = [t for t in tools if getattr(t, "name", None) not in _RARELY_USED_TOOLS]
++    if not filtered:
++        return list(tools)
++    return filtered

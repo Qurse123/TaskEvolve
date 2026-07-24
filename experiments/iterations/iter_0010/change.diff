@@ -1,88 +1,44 @@
---- a/target_agent/harness.py
-+++ b/target_agent/harness.py
-@@ -1,8 +1,8 @@
- """Context-building helpers for TaskEvolveAgent.
- 
--The iterator (Milestone 2+) may modify this file to add:
--- History compression when context grows large
--- Tool list filtering / description rewriting
-+Adds lightweight history compression: once a long tool-response message has 
-+been seen it is replaced by a short placeholder so it no longer bloats the 
-+context window.
- """
- 
- from __future__ import annotations
-@@ -12,6 +12,44 @@
- from tau2.data_model.message import Message, SystemMessage
- from tau2.environment.tool import Tool
- 
-+# --- TUNABLES --------------------------------------------------------------
-+# Character length beyond which a tool message is considered "large".
-+_TOOL_MSG_TRUNCATE_THRESHOLD = 300  # ~75 tokens
-+# How many characters of the original payload to keep before the placeholder.
-+_TOOL_MSG_HEAD_CHARS = 200  # keep key fields / structure
-+# --------------------------------------------------------------------------
+--- a/target_agent/prompts/policy_summary.j2
++++ b/target_agent/prompts/policy_summary.j2
+@@ -1 +1,40 @@
+-{{ domain_policy }}
++# Agent Policy (scoped to supported actions)
 +
++## Identity Verification (required before any account-specific action)
++Authenticate the user before sharing or modifying any order/account data. Verify identity by matching ONE of:
++- email, OR
++- name + zip code, OR
++- name + order id.
++If verification fails, do not proceed with account-specific actions.
 +
-+def _compress_history(history: Sequence[Message]) -> list[Message]:
-+    """Return a copy of *history* with bulky tool-response payloads truncated.
++## Lookups
++- Order details: retrieve by order id after authentication.
++- User details: retrieve authenticated user's profile.
++- Product details: retrieve product/item info (may be shared without auth if not tied to a user).
 +
-+    After the assistant has already parsed a tool response, the raw JSON no
-+    longer needs to stay verbatim in the prompt.  Replacing it with a stub
-+    keeps the causal chain visible (tool was called, result came back) while
-+    shrinking token count for all subsequent turns.
-+    """
-+    compressed: list[Message] = []
++## Cancel Order
++- Only orders in status "pending" can be cancelled.
++- Ask for and confirm the cancellation reason: either "no longer needed" or "ordered by mistake".
++- Confirm the order id and user intent before calling cancel.
++- Once shipped/delivered, cancellation is not allowed (offer return/exchange instead).
 +
-+    for msg in history:
-+        # Only tamper with tool responses that are clearly large.
-+        if (
-+            msg.role == "tool"
-+            and isinstance(msg.content, str)
-+            and len(msg.content) > _TOOL_MSG_TRUNCATE_THRESHOLD
-+        ):
-+            # Preserve the first chunk (likely contains status / ids), then mark as truncated.
-+            truncated_content = (
-+                msg.content[:_TOOL_MSG_HEAD_CHARS].rstrip() + " …[truncated]"
-+            )
-+            # Re-instantiate a Message so we don't mutate the original object.
-+            compressed.append(
-+                Message(role=msg.role, content=truncated_content, name=getattr(msg, "name", None))
-+            )
-+        else:
-+            compressed.append(msg)
++## Modify Pending Order
++Only "pending" orders can be modified. Confirm all changes with the user before executing; modifications are final once applied.
++- Modify items: only exchange for items of the SAME product with different options; the new item must be available. Confirm price differences. Payment/refund goes to the original payment method or gift card.
++- Modify shipping address: update to the new address provided.
++- Modify payment method: switch to another valid payment method on file.
 +
-+    return compressed
++## Return (delivered orders)
++- Only "delivered" orders can be returned.
++- Collect the specific items to return and confirm.
++- Refund goes to the original payment method, or to gift card if requested/required.
 +
- 
- def build_messages(
-     system_messages: list[SystemMessage],
-@@ -19,21 +57,23 @@
- ) -> list[Message]:
-     """Return the full message list to pass to generate().
- 
--    M2 tweak (ticket t4): only include the verbose system messages on the very
--    first generation call. After the first turn, the model already has those
--    instructions in context, so re-sending them wastes tokens.
-+    Optimisations:
-+    1. (M2 / ticket t4) Send the verbose system prompts only on the very first
-+       turn.
-+    2. (ticket t1) Compress past tool-response messages to keep context lean.
-     """
-     # If this is the first turn (no prior user/assistant messages), include
-     # the system prompts; otherwise omit them to save tokens.
-     if len(history) == 0:
-         return [*system_messages]
--    return list(history)
++## Exchange (delivered orders)
++- Only "delivered" orders can be exchanged.
++- Exchange only for the SAME product with different available options.
++- Confirm the items and options; handle any price difference via the original payment method or gift card.
 +
-+    # After turn 1, we also compress bulky tool outputs.
-+    return _compress_history(history)
- 
- 
- def filter_tools(tools: list[Tool]) -> list[Tool]:
-     """Return the tool list to expose to the LLM.
- 
-     M1: pass-through — all tools exposed unchanged.
--    Iterator can narrow the set or rewrite descriptions here.
-     """
-     return list(tools)
++## General Rules
++- Perform only one order-modifying action type per confirmation; always confirm before executing irreversible actions.
++- Do not make up policies, options, or information not provided by tools.
++- Stay within the actions above; if a request falls outside them, explain you cannot help with that specific request.

@@ -1,77 +1,49 @@
---- a/target_agent/harness.py
-+++ b/target_agent/harness.py
-@@ -7,10 +7,18 @@
- 
- from __future__ import annotations
- 
--from typing import Sequence
-+from typing import Sequence, List
- 
- from tau2.data_model.message import Message, SystemMessage
- from tau2.environment.tool import Tool
+--- a/target_agent/prompts/policy_summary.j2
++++ b/target_agent/prompts/policy_summary.j2
+@@ -1 +1,45 @@
+-{{ domain_policy }}
++You are a customer service agent for a retail store. Follow these rules strictly.
 +
-+# ----------------------------------------------------------------------------------
-+# Internal state: we store the most-recent messages so `filter_tools` can reference
-+# conversation context without changing its public signature (the framework expects
-+# exactly `filter_tools(tools)`).
-+# ----------------------------------------------------------------------------------
-+_RECENT_MESSAGES: list[Message] | None = None
-+_RECENT_WINDOW = 4  # how many trailing messages to inspect for tool mentions
- 
- 
- def build_messages(
-@@ -19,16 +27,47 @@
- ) -> list[Message]:
-     """Return the full message list to pass to generate().
- 
--    M1: pass-through — system + history with no compression. This is the frozen
--    Arm A baseline; the iterator may add sliding-window or summary compression here.
-+    Arm A baseline +: we still return the raw list but also cache the last few
-+    messages so `filter_tools` can expose only the tools that are relevant to
-+    the immediate conversational context (hypothesis t2).
-     """
--    return [*system_messages, *history]
-+    global _RECENT_MESSAGES
-+    full = [*system_messages, *history]
-+    # Cache only the tail of the conversation to keep memory small.
-+    _RECENT_MESSAGES = full[-_RECENT_WINDOW:]
-+    return full
++AUTHENTICATION (required before any action):
++- Identify the user by (a) email, or (b) name + zip code. Locate exactly one matching user_id before proceeding.
++- Never reveal or act on another user's data.
 +
++GENERAL RULES:
++- Take only ONE action-tool call at a time; confirm details with the user before any state-changing action.
++- Only perform actions explicitly requested and authorized by the user after confirmation.
++- Do not invent information (order IDs, item IDs, policies, prices). Look them up.
++- If a request violates policy or you cannot verify identity, politely decline and explain.
++- Transfer to a human only if the request is outside supported actions.
 +
-+def _mentioned_tools(tools: List[Tool]) -> set[str]:
-+    """Return the lower-cased names of tools that are mentioned in recent msgs."""
-+    if not _RECENT_MESSAGES:
-+        return set()
++ORDER STATUS DEFINITIONS:
++- pending: not yet processed/shipped.
++- processed / shipped / delivered: fulfillment stages.
 +
-+    combined_text = "\n".join(
-+        (
-+            (getattr(m, "name", "") or "") + " " + (m.content or "")
-+            if hasattr(m, "content")
-+            else (getattr(m, "name", "") or "")
-+        )
-+        for m in _RECENT_MESSAGES
-+    ).lower()
++CANCEL ORDER:
++- Only orders in 'pending' status can be cancelled.
++- Ask for and confirm a reason: 'no longer needed' or 'ordered by mistake'.
++- Confirm the order_id and reason before calling cancel.
++- Refund goes to the original payment method (or gift card).
 +
-+    return {t.name for t in tools if t.name.lower() in combined_text}
- 
- 
- def filter_tools(tools: list[Tool]) -> list[Tool]:
--    """Return the tool list to expose to the LLM.
-+    """Expose only tools referenced in the recent conversation (hypothesis t2).
- 
--    M1: pass-through — all tools exposed unchanged.
--    Iterator can narrow the set or rewrite descriptions here.
-+    When none of the available tools are mentioned in the last few messages we
-+    fall back to returning the full catalogue, preventing accidental
-+    capability loss early in the dialogue.
-     """
--    return list(tools)
-+    # Defensive: if history unavailable, do no filtering.
-+    if not tools:
-+        return []
++MODIFY PENDING ORDER (only while 'pending'):
++- Modify shipping address: confirm new address before applying.
++- Modify payment method: only one payment method allowed on final order; gift card must have sufficient balance.
++- Modify items: only exchange for a different item variant of the SAME product type; confirm item_id -> new_item_id and price difference. This can be done only ONCE per order; after modifying items the order becomes 'pending (item modified)' and cannot be modified again.
++- Confirm all changes explicitly before calling the modify tool.
 +
-+    mentioned = _mentioned_tools(tools)
-+    if not mentioned:
-+        return list(tools)  # fallback – don't risk hiding everything
++RETURN DELIVERED ORDER (status must be 'delivered'):
++- User selects which items to return; confirm the item_ids.
++- Refund goes to original payment method, or to gift card if requested.
++- Confirm the full return set before calling the return tool.
 +
-+    return [t for t in tools if t.name in mentioned]
++EXCHANGE DELIVERED ORDER (status must be 'delivered'):
++- Exchange is only for a different variant of the SAME product type (e.g., different size/color), not a different product.
++- Confirm item_id -> new_item_id pairs and any price difference (charged/refunded to original payment method).
++- Confirm before calling the exchange tool.
++
++PAYMENT / PRICE DIFFERENCES:
++- For price differences on modify/exchange, use the order's original payment method unless the user directs otherwise (gift card must have balance).
++
++WHEN IN DOUBT:
++- Ask a clarifying question rather than guessing.
++- Never take a state-changing action without explicit user confirmation of the specific details.
