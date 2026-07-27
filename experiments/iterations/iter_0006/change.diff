@@ -1,23 +1,107 @@
---- a/target_agent/prompts/system_prompt.j2
-+++ b/target_agent/prompts/system_prompt.j2
-@@ -1,5 +1,7 @@
- <instructions>
--You are a customer service agent that helps the user according to the <policy> provided below.
-+{{ domain_policy }}
-+
-+You are a customer service agent that helps the user according to the <policy> provided above.
- In each turn you can either:
- - Send a message to the user.
- - Make a tool call.
-@@ -7,10 +9,7 @@
+--- a/target_agent/harness.py
++++ b/target_agent/harness.py
+@@ -7,10 +7,75 @@
  
- Try to be helpful and always follow the policy. Always make sure you generate valid JSON only.
- </instructions>
--<policy>
--{{ domain_policy }}
--</policy>
- {% if example_conversations %}<examples>
- {{ example_conversations }}
- </examples>
--{% endif %}
-+{% endif %}
+ from __future__ import annotations
+ 
+-from typing import Sequence
++import json
++import re
++from typing import Any, Sequence
+ 
+-from tau2.data_model.message import Message, SystemMessage
++from tau2.data_model.message import Message, SystemMessage, ToolMessage
+ from tau2.environment.tool import Tool
++
++
++# Fields the agent actually references from a get_order_details result.
++# Everything else (addresses, per-item metadata bloat, timestamps, tracking,
++# fulfillment internals, etc.) is dropped to shrink re-sent input tokens.
++_KEEP_TOP_LEVEL = {"order_id", "status"}
++_KEEP_ITEM_FIELDS = {"item_id", "name", "product_id", "options", "price"}
++
++
++def _compress_item(item: Any) -> Any:
++    if not isinstance(item, dict):
++        return item
++    return {k: v for k, v in item.items() if k in _KEEP_ITEM_FIELDS}
++
++
++def _compress_order_payload(payload: dict) -> dict:
++    """Keep only decision-relevant fields: order_id, status, and item
++    options/prices. Preserves every order (no truncation of older blobs),
++    only removes address/metadata bloat within each blob.
++    """
++    compressed: dict[str, Any] = {}
++    for k, v in payload.items():
++        if k in _KEEP_TOP_LEVEL:
++            compressed[k] = v
++        elif k == "items" and isinstance(v, list):
++            compressed["items"] = [_compress_item(it) for it in v]
++    return compressed
++
++
++def _looks_like_order_details(payload: dict) -> bool:
++    # Only compress blobs that are clearly get_order_details results:
++    # they carry an order_id and an items list. This avoids touching
++    # unrelated tool results.
++    return (
++        "order_id" in payload
++        and "items" in payload
++        and isinstance(payload.get("items"), list)
++    )
++
++
++def _compress_tool_message(msg: ToolMessage) -> ToolMessage:
++    content = getattr(msg, "content", None)
++    if not isinstance(content, str) or not content.strip():
++        return msg
++
++    # Attempt to parse the tool result as JSON. If it isn't a single JSON
++    # object that looks like an order-details blob, leave it untouched.
++    try:
++        parsed = json.loads(content)
++    except (json.JSONDecodeError, ValueError):
++        return msg
++
++    if not isinstance(parsed, dict) or not _looks_like_order_details(parsed):
++        return msg
++
++    compressed = _compress_order_payload(parsed)
++    new_content = json.dumps(compressed, separators=(",", ":"))
++
++    # If compression didn't actually shrink anything, keep the original.
++    if len(new_content) >= len(content):
++        return msg
++
++    return msg.model_copy(update={"content": new_content})
+ 
+ 
+ def build_messages(
+@@ -19,12 +84,21 @@
+ ) -> list[Message]:
+     """Return the full message list to pass to generate().
+ 
+-    Static Arm A v0.1 harness: pass-through — system + history with no
+-    compression, so the system prompt/policy is present on every turn. This is
+-    the frozen baseline the open-weight arms (C/D) run against; the Arm B iterator
+-    variant (v0.2, drop-system-after-turn-1) lives on its own branch.
++    Field-level compression of get_order_details tool results (ticket t2):
++    these result blobs are the single largest carried-context payload and are
++    re-sent verbatim every turn. Rather than truncating older blobs (which
++    previously crossed the success floor because dropped blobs were still
++    referenced), we keep EVERY order blob but strip each to only the fields the
++    agent uses: order_id, status, and item options/prices. Address/metadata
++    bloat is removed, so no decision-relevant information is lost.
+     """
+-    return [*system_messages, *history]
++    processed: list[Message] = []
++    for msg in history:
++        if isinstance(msg, ToolMessage):
++            processed.append(_compress_tool_message(msg))
++        else:
++            processed.append(msg)
++    return [*system_messages, *processed]
+ 
+ 
+ def filter_tools(tools: list[Tool]) -> list[Tool]:

@@ -1,0 +1,28 @@
+{
+  "iteration_id": "iter_0012",
+  "timestamp": "2026-07-25T18:53:54.817023+00:00",
+  "harness_version": "v0.2",
+  "changed_surface": "harness",
+  "changed_file": "target_agent/harness.py",
+  "change_summary": "Rewrite only the get_order_details tool description in filter_tools to instruct issuing multiple order lookups as a single parallel batch.",
+  "reason_for_change": "Multi-order tasks (54/103/8/20) drive high turn counts (38/35/33/25) via 3-6 sequential get_order_details calls, each a separate round-trip generating a full-context billed turn. Prompt-level batching hints were rejected, so this modifies the mechanism directly at the tool-description level: signaling the lookups are independent and batchable encourages parallel tool calls in one turn, collapsing round-trips and cutting billed generation turns/tokens per task. It leaves the system prompt/policy and verification flow untouched, so success stays at floor while mean cost drops on the multi-order tasks that dominate turn count.",
+  "proxy_seeds": [
+    5045
+  ],
+  "proxy_task_success_before_mean": 0.7916666666666667,
+  "proxy_task_success_before_std": 0.05892556509887899,
+  "proxy_task_success_after_mean": 0.75,
+  "proxy_task_success_after_std": 0.0,
+  "cost_per_successful_task_before": 0.6064168611111111,
+  "cost_per_successful_task_after": 0.6222055555555556,
+  "accepted_or_rejected": "rejected",
+  "reason_accepted_or_rejected": "rejected: first proxy run did not improve \u2014 crossed success guardrail: pass_rate 0.7500 < floor 0.7521",
+  "iterator_search_cost_usd": 0.040925,
+  "notes": "",
+  "editor_model": "anthropic/claude-opus-4-8",
+  "agent_model": "anthropic/claude-opus-4-8",
+  "cost_per_task_before": 0.4795718750000001,
+  "cost_per_task_after": 0.46665416666666665,
+  "ticket_id": "t3",
+  "hypothesis": "The agent re-fetches get_order_details one order at a time (40 calls total, 5-6 per multi-order task like 54/103/8/20) but the model already reasons over addresses/items; instructing the agent in the harness tool descriptions to fetch all candidate orders in a single parallel batch reduces round-trip turns."
+}

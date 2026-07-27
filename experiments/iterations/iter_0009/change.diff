@@ -1,52 +1,11 @@
---- a/target_agent/harness.py
-+++ b/target_agent/harness.py
-@@ -7,7 +7,8 @@
+--- a/target_agent/prompts/policy_summary.j2
++++ b/target_agent/prompts/policy_summary.j2
+@@ -2,6 +2,8 @@
  
- from __future__ import annotations
+ IDENTITY VERIFICATION (required before any account action):
+ - Verify the customer by confirming BOTH: (1) name on account, and (2) one of: email, zip code, or account/order ID.
++- Up front, ask for the single most reliable identifier first: the order ID or full email address. Request name plus one of these in your initial verification prompt so a lookup can succeed in one attempt.
++- Accept the FIRST successful match as verified; do not re-confirm or re-ask for identifiers once a lookup succeeds. Avoid repeated find_user retries with different name/email combinations.
+ - Do not disclose account details or take actions until verification succeeds.
  
--from typing import Sequence
-+from typing import Sequence, List
-+from dataclasses import replace
- 
- from tau2.data_model.message import Message, SystemMessage
- from tau2.environment.tool import Tool
-@@ -30,10 +31,35 @@
-     return list(history)
- 
- 
--def filter_tools(tools: list[Tool]) -> list[Tool]:
-+def _first_sentence(text: str) -> str:
-+    """Return the first sentence (trimmed) from the input text."""
-+    sent = text.split(".")[0].strip()
-+    return sent + "." if not sent.endswith(".") else sent
-+
-+
-+def filter_tools(tools: List[Tool]) -> List[Tool]:
-     """Return the tool list to expose to the LLM.
- 
--    M1: pass-through — all tools exposed unchanged.
--    Iterator can narrow the set or rewrite descriptions here.
-+    M3 (ticket t5): shorten each tool description to its first sentence to cut
-+    tokens while leaving the JSON schema and functionality intact.
-     """
--    return list(tools)
-+    shortened: List[Tool] = []
-+    for t in tools:
-+        # Only attempt to shorten if a non-empty description attribute exists.
-+        desc = getattr(t, "description", None)
-+        if isinstance(desc, str) and desc:
-+            short_desc = _first_sentence(desc)
-+            # dataclasses.replace preserves all fields except those we change.
-+            try:
-+                t_shrunk = replace(t, description=short_desc)
-+            except TypeError:
-+                # Fallback: mutate directly if replace fails (e.g., not frozen).
-+                try:
-+                    t.description = short_desc  # type: ignore[attr-defined]
-+                except Exception:
-+                    pass  # If mutation fails, leave as-is.
-+                t_shrunk = t
-+        else:
-+            t_shrunk = t
-+        shortened.append(t_shrunk)
-+    return shortened
+ CANCELLATIONS:

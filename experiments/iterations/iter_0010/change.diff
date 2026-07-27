@@ -1,88 +1,190 @@
---- a/target_agent/harness.py
-+++ b/target_agent/harness.py
-@@ -1,8 +1,8 @@
- """Context-building helpers for TaskEvolveAgent.
- 
--The iterator (Milestone 2+) may modify this file to add:
--- History compression when context grows large
--- Tool list filtering / description rewriting
-+Adds lightweight history compression: once a long tool-response message has 
-+been seen it is replaced by a short placeholder so it no longer bloats the 
-+context window.
- """
+--- a/target_agent/model_routing.py
++++ b/target_agent/model_routing.py
+@@ -7,15 +7,181 @@
  
  from __future__ import annotations
-@@ -12,6 +12,44 @@
- from tau2.data_model.message import Message, SystemMessage
- from tau2.environment.tool import Tool
  
-+# --- TUNABLES --------------------------------------------------------------
-+# Character length beyond which a tool message is considered "large".
-+_TOOL_MSG_TRUNCATE_THRESHOLD = 300  # ~75 tokens
-+# How many characters of the original payload to keep before the placeholder.
-+_TOOL_MSG_HEAD_CHARS = 200  # keep key fields / structure
-+# --------------------------------------------------------------------------
++HAIKU = "anthropic/claude-haiku-4-5"
++
++# Signals that the user has no further task needs and the turn is pure
++# closing/pleasantry chatter. We route ONLY these to the cheap model.
++_CLOSING_USER_SIGNALS = (
++    "no more",
++    "nothing else",
++    "that's all",
++    "thats all",
++    "that is all",
++    "that's it",
++    "thats it",
++    "that is it",
++    "no thanks",
++    "no thank you",
++    "i'm good",
++    "im good",
++    "all good",
++    "all set",
++    "we're good",
++    "were good",
++    "nope",
++    "good day",
++    "goodbye",
++    "bye",
++    "take care",
++    "see you",
++    "thanks for your help",
++    "thank you for your help",
++    "that will be all",
++    "nothing more",
++)
++
++# Anything that looks like a real request/decision should NEVER be routed cheap.
++# If these appear in the latest user message we refuse to treat it as closing.
++_TASK_RISK_SIGNALS = (
++    "?",
++    "can you",
++    "could you",
++    "please",
++    "i want",
++    "i need",
++    "i'd like",
++    "id like",
++    "i would like",
++    "add",
++    "remove",
++    "change",
++    "cancel",
++    "refund",
++    "order",
++    "buy",
++    "return",
++    "instead",
++    "actually",
++    "wait",
++    "how",
++    "what",
++    "where",
++    "when",
++    "why",
++    "which",
++    "confirm",
++    "yes",
++    "yeah",
++    "sure",
++    "ok",
++    "okay",
++)
 +
 +
-+def _compress_history(history: Sequence[Message]) -> list[Message]:
-+    """Return a copy of *history* with bulky tool-response payloads truncated.
++def _text_of(msg) -> str:
++    """Best-effort extraction of the textual content of a message."""
++    if msg is None:
++        return ""
++    content = None
++    role = None
++    if isinstance(msg, dict):
++        content = msg.get("content")
++        role = msg.get("role")
++    else:
++        content = getattr(msg, "content", None)
++        role = getattr(msg, "role", None)
++    parts = []
++    if isinstance(content, str):
++        parts.append(content)
++    elif isinstance(content, (list, tuple)):
++        for p in content:
++            if isinstance(p, str):
++                parts.append(p)
++            elif isinstance(p, dict):
++                t = p.get("text")
++                if isinstance(t, str):
++                    parts.append(t)
++            else:
++                t = getattr(p, "text", None)
++                if isinstance(t, str):
++                    parts.append(t)
++    return (" ".join(parts)).strip(), (role or "")
 +
-+    After the assistant has already parsed a tool response, the raw JSON no
-+    longer needs to stay verbatim in the prompt.  Replacing it with a stub
-+    keeps the causal chain visible (tool was called, result came back) while
-+    shrinking token count for all subsequent turns.
-+    """
-+    compressed: list[Message] = []
 +
-+    for msg in history:
-+        # Only tamper with tool responses that are clearly large.
-+        if (
-+            msg.role == "tool"
-+            and isinstance(msg.content, str)
-+            and len(msg.content) > _TOOL_MSG_TRUNCATE_THRESHOLD
-+        ):
-+            # Preserve the first chunk (likely contains status / ids), then mark as truncated.
-+            truncated_content = (
-+                msg.content[:_TOOL_MSG_HEAD_CHARS].rstrip() + " …[truncated]"
-+            )
-+            # Re-instantiate a Message so we don't mutate the original object.
-+            compressed.append(
-+                Message(role=msg.role, content=truncated_content, name=getattr(msg, "name", None))
-+            )
-+        else:
-+            compressed.append(msg)
++def _role_of(msg) -> str:
++    if isinstance(msg, dict):
++        return (msg.get("role") or "").lower()
++    return (getattr(msg, "role", "") or "").lower()
 +
-+    return compressed
++
++def _has_pending_tool(msg) -> bool:
++    """Detect tool calls / tool activity that indicate task work is in flight."""
++    if msg is None:
++        return False
++    if isinstance(msg, dict):
++        if msg.get("tool_calls") or msg.get("tool_call_id") or msg.get("function_call"):
++            return True
++        if (msg.get("role") or "").lower() == "tool":
++            return True
++    else:
++        if getattr(msg, "tool_calls", None) or getattr(msg, "tool_call_id", None):
++            return True
++        if (getattr(msg, "role", "") or "").lower() == "tool":
++            return True
++    return False
++
++
++def _last_user_message(history):
++    for msg in reversed(history):
++        if _role_of(msg) == "user":
++            return msg
++    return None
++
++
++def _is_pure_closing_turn(history) -> bool:
++    """True only when the latest user message is pure post-completion pleasantry
++    with no task risk and no tool work pending anywhere recent."""
++    if not history:
++        return False
++
++    last_user = _last_user_message(history)
++    if last_user is None:
++        return False
++
++    text, _ = _text_of(last_user)
++    low = text.lower()
++
++    # Must be short — real requests tend to be longer.
++    if len(low) == 0 or len(low) > 60:
++        return False
++
++    # Any hint of a task/decision/question => not a closing turn.
++    for risk in _TASK_RISK_SIGNALS:
++        if risk in low:
++            return False
++
++    # Must positively match a closing signal.
++    if not any(sig in low for sig in _CLOSING_USER_SIGNALS):
++        return False
++
++    # No tool activity pending in the last couple of messages.
++    for msg in list(history)[-3:]:
++        if _has_pending_tool(msg):
++            return False
++
++    return True
 +
  
- def build_messages(
-     system_messages: list[SystemMessage],
-@@ -19,21 +57,23 @@
- ) -> list[Message]:
-     """Return the full message list to pass to generate().
+ def get_model(configured_model: str, history=None) -> str:
+     """Return the model to use for the current generation call.
  
--    M2 tweak (ticket t4): only include the verbose system messages on the very
--    first generation call. After the first turn, the model already has those
--    instructions in context, so re-sending them wastes tokens.
-+    Optimisations:
-+    1. (M2 / ticket t4) Send the verbose system prompts only on the very first
-+       turn.
-+    2. (ticket t1) Compress past tool-response messages to keep context lean.
+-    ``history`` is the conversation so far (the agent passes ``state.messages``),
+-    so a routing policy can branch on context — e.g. a cheap model for simple
+-    early turns, a strong model for complex later ones. This baseline is the
+-    identity: it ignores ``history`` and always returns the configured model.
+-    The iterator (Exp 2) may rewrite this into a cost-aware routing policy over
+-    the allowed model pool.
++    Baseline behavior is the identity mapping. The only deviation: when the
++    latest turn is a pure post-completion closing/pleasantry turn (the user has
++    signaled no further needs, no question, no decision, no pending tool work),
++    route to the cheapest model. These turns carry zero task risk, so success
++    (the hard floor) is preserved while output-token cost on the final 1-2
++    pleasantry turns is cut.
      """
-     # If this is the first turn (no prior user/assistant messages), include
-     # the system prompts; otherwise omit them to save tokens.
-     if len(history) == 0:
-         return [*system_messages]
--    return list(history)
-+
-+    # After turn 1, we also compress bulky tool outputs.
-+    return _compress_history(history)
- 
- 
- def filter_tools(tools: list[Tool]) -> list[Tool]:
-     """Return the tool list to expose to the LLM.
- 
-     M1: pass-through — all tools exposed unchanged.
--    Iterator can narrow the set or rewrite descriptions here.
-     """
-     return list(tools)
++    if history and _is_pure_closing_turn(history):
++        return HAIKU
+     return configured_model

@@ -1,21 +1,24 @@
---- a/target_agent/harness.py
-+++ b/target_agent/harness.py
-@@ -19,10 +19,15 @@
- ) -> list[Message]:
-     """Return the full message list to pass to generate().
- 
--    M1: pass-through — system + history with no compression. This is the frozen
--    Arm A baseline; the iterator may add sliding-window or summary compression here.
-+    M2 tweak (ticket t4): only include the verbose system messages on the very
-+    first generation call. After the first turn, the model already has those
-+    instructions in context, so re-sending them wastes tokens.
-     """
--    return [*system_messages, *history]
-+    # If this is the first turn (no prior user/assistant messages), include
-+    # the system prompts; otherwise omit them to save tokens.
-+    if len(history) == 0:
-+        return [*system_messages]
-+    return list(history)
- 
- 
- def filter_tools(tools: list[Tool]) -> list[Tool]:
+--- a/target_agent/prompts/policy_summary.j2
++++ b/target_agent/prompts/policy_summary.j2
+@@ -1 +1,20 @@
+-{{ domain_policy }}
++OPERATIONAL POLICY CHECKLIST (authoritative — follow exactly):
++
++IDENTITY VERIFICATION (required before any account action):
++- Verify the customer by confirming BOTH: (1) name on account, and (2) one of: email, zip code, or account/order ID.
++- Do not disclose account details or take actions until verification succeeds.
++
++CANCELLATIONS:
++- Only two valid cancel reasons are permitted: "no longer needed" and "ordered by mistake".
++- If the customer's reason does not match one of these, do not cancel; explain the valid reasons.
++- Confirm the specific order and reason with the customer before cancelling.
++
++REFUND ROUTING:
++- Refund to the ORIGINAL payment method by default.
++- Gift-card / store-credit purchases refund to store credit.
++- Only offer an alternate refund method if the original method is unavailable, and confirm with the customer first.
++
++GENERAL RULES:
++- Take only actions the customer explicitly requests and that policy allows.
++- Confirm irreversible actions before executing.
++- If a request falls outside these rules, decline politely and explain why.

@@ -1,88 +1,83 @@
---- a/target_agent/model_routing.py
-+++ b/target_agent/model_routing.py
-@@ -1,20 +1,75 @@
- """Model selection for TaskEvolveAgent.
- 
--The iterator (Milestone 2+) may modify this file to add:
--- Cheap/strong routing based on turn count or confidence
--- Per-task-type model selection
-+This router tries to use the cheaper ``gpt-4.1-mini`` for the many
-+mechanical mid-/late-conversation turns (status updates, tool dispatches,
-+short acknowledgements) while keeping the stronger ``gpt-4.1`` for the few
-+turns that really need heavy reasoning.
-+
-+Heuristic:
-+1. First turn  → mini (unchanged).
-+2. If the running conversation already exceeds ~300 tokens of content
-+   (≈1200 characters) we stick with the configured model because future
-+   reasoning is likely complex.
-+3. Otherwise, look at the last assistant message:
-+      • If it was a tool call *or* its textual content is very short
-+        (<50 chars), we treat the next user turn as a lightweight follow-up
-+        and route to the mini model.
-+4. Fallback → configured model.
-+
-+This simple rule shifts many follow-up exchanges to the 5× cheaper model while
-+still engaging the full model when useful, reducing mean cost without harming
-+success.
- """
+--- a/target_agent/harness.py
++++ b/target_agent/harness.py
+@@ -7,10 +7,42 @@
  
  from __future__ import annotations
-+from typing import List, Dict, Any
  
++import copy
+ from typing import Sequence
  
--def get_model(configured_model: str, history=None) -> str:
--    """Return the model to use for the current generation call.
-+def _approx_token_count(history: List[Dict[str, Any]]) -> int:
-+    """Rough token estimate (≈4 chars / token)."""
-+    total_chars = 0
-+    for msg in history:
-+        total_chars += len((msg.get("content") or ""))
-+    return total_chars // 4  # integer division suffices for routing
- 
--    Routes to gpt-4.1-mini if there is no conversation history (i.e., first turn),
--    otherwise uses the configured model. This sends simple, tool-free, single-turn tasks
--    to the cheaper model by default.
--    """
--    if history is not None and len(history) == 0:
+-from tau2.data_model.message import Message, SystemMessage
++from tau2.data_model.message import Message, SystemMessage, ToolMessage
+ from tau2.environment.tool import Tool
 +
-+def _needs_mini(history: List[Dict[str, Any]]) -> bool:
-+    """Return True if the next turn looks lightweight (tool/ack)."""
-+    if not history:
-+        return True  # first turn handled earlier but keep safe
++# Keep the most recent N tool results verbatim; older ones get truncated.
++# The agent typically only needs full detail from recent tool calls; older
++# large JSON blobs (e.g. get_order_details) are re-sent every turn otherwise.
++_KEEP_RECENT_TOOL_RESULTS = 4
++_TRUNCATE_THRESHOLD_CHARS = 600
++_TRUNCATE_KEEP_CHARS = 400
 +
-+    # Heavy context? stay with full model.
-+    if _approx_token_count(history) > 300:
-+        return False
 +
-+    # Find last assistant message
-+    last_assistant = next(
-+        (m for m in reversed(history) if m.get("role") == "assistant"), None
++def _content_text(content) -> str | None:
++    if isinstance(content, str):
++        return content
++    return None
++
++
++def _compress_tool_message(msg: ToolMessage) -> ToolMessage:
++    """Return a copy of a ToolMessage with a truncated content blob.
++
++    Only truncates plain-string content that exceeds the threshold. Leaves
++    non-string / structured content untouched to avoid breaking parsing.
++    """
++    text = _content_text(msg.content)
++    if text is None or len(text) <= _TRUNCATE_THRESHOLD_CHARS:
++        return msg
++    truncated = (
++        text[:_TRUNCATE_KEEP_CHARS]
++        + f"\n...[older tool result truncated: {len(text) - _TRUNCATE_KEEP_CHARS} chars omitted]"
 +    )
-+    if not last_assistant:
-+        return False  # no assistant yet → probably first reasoning step
++    new_msg = copy.copy(msg)
++    new_msg.content = truncated
++    return new_msg
+ 
+ 
+ def build_messages(
+@@ -19,12 +51,31 @@
+ ) -> list[Message]:
+     """Return the full message list to pass to generate().
+ 
+-    Static Arm A v0.1 harness: pass-through — system + history with no
+-    compression, so the system prompt/policy is present on every turn. This is
+-    the frozen baseline the open-weight arms (C/D) run against; the Arm B iterator
+-    variant (v0.2, drop-system-after-turn-1) lives on its own branch.
++    Cost-focused variant: system + history, but with OLD, large tool-result
++    blobs truncated. The policy stays in the system slot (unchanged) so
++    guidance is fully preserved; we only shrink stale, repeatedly re-sent
++    tool-output JSON that dominates input tokens on turn-heavy tasks
++    (e.g. tasks 23/54 at 41-43 turns re-echoing get_order_details each call).
 +
-+    # If assistant just issued a tool call, next step is usually lightweight.
-+    if (
-+        last_assistant.get("tool_calls")
-+        or last_assistant.get("tool_call_id")
-+        or (last_assistant.get("content") or "").strip().upper().startswith("CALL_")
-+    ):
-+        return True
++    The most recent tool results are kept verbatim so the model still has full
++    detail for the step it is currently reasoning about, protecting success.
+     """
+-    return [*system_messages, *history]
++    history_list = list(history)
 +
-+    # Very short assistant utterances are often simple acknowledgements.
-+    if len((last_assistant.get("content") or "").strip()) < 50:
-+        return True
++    # Identify indices of ToolMessages so we can keep the most recent ones intact.
++    tool_indices = [
++        i for i, m in enumerate(history_list) if isinstance(m, ToolMessage)
++    ]
++    protected = set(tool_indices[-_KEEP_RECENT_TOOL_RESULTS:])
 +
-+    return False
++    processed: list[Message] = []
++    for i, m in enumerate(history_list):
++        if isinstance(m, ToolMessage) and i not in protected:
++            processed.append(_compress_tool_message(m))
++        else:
++            processed.append(m)
 +
-+
-+def get_model(configured_model: str, history: List[dict] | None = None) -> str:
-+    """Select ``gpt-4.1`` vs ``gpt-4.1-mini`` based on the above heuristic."""
-+    if history is None or len(history) == 0:
-+        return "gpt-4.1-mini"  # cheap for very first turn
-+
-+    if _needs_mini(history):
-         return "gpt-4.1-mini"
-+
-     return configured_model
++    return [*system_messages, *processed]
+ 
+ 
+ def filter_tools(tools: list[Tool]) -> list[Tool]:

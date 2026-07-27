@@ -1,46 +1,12 @@
---- a/target_agent/harness.py
-+++ b/target_agent/harness.py
-@@ -12,6 +12,21 @@
- from tau2.data_model.message import Message, SystemMessage
- from tau2.environment.tool import Tool
+--- a/target_agent/prompts/policy_summary.j2
++++ b/target_agent/prompts/policy_summary.j2
+@@ -1,4 +1,9 @@
+ OPERATIONAL POLICY CHECKLIST (authoritative — follow exactly):
++
++ORDER LOOKUP (do this before fetching order details):
++- When the customer references an order or items in it, FIRST ask the customer for the order ID.
++- Only if the customer cannot provide the order ID, fall back to a bulk/order-list lookup to locate it.
++- Do NOT fetch full order details one-by-one to search for items; retrieve details only for the specific identified order.
  
-+# Keep at most this many user/assistant exchanges (pair of messages) in context
-+_MAX_EXCHANGES_TO_KEEP = 10  # 10 exchanges ≈ 20 messages
-+
-+
-+def _trim_history(history: Sequence[Message]) -> list[Message]:
-+    """Return the most recent portion of history, capped by _MAX_EXCHANGES_TO_KEEP.
-+
-+    One *exchange* is a user→assistant pair, so we keep 2×N messages.
-+    This sliding-window is a simple, safe way to bound context length.
-+    """
-+    max_msgs = _MAX_EXCHANGES_TO_KEEP * 2  # user + assistant per exchange
-+    if len(history) <= max_msgs:
-+        return list(history)
-+    return list(history[-max_msgs:])
-+
- 
- def build_messages(
-     system_messages: list[SystemMessage],
-@@ -22,12 +37,18 @@
-     M2 tweak (ticket t4): only include the verbose system messages on the very
-     first generation call. After the first turn, the model already has those
-     instructions in context, so re-sending them wastes tokens.
-+
-+    New (ticket t1): after the first turn, keep only the most recent
-+    `_MAX_EXCHANGES_TO_KEEP` user/assistant exchanges to cap token cost on
-+    long dialogues without hurting task recall.
-     """
--    # If this is the first turn (no prior user/assistant messages), include
--    # the system prompts; otherwise omit them to save tokens.
-+    # First turn: include system prompts verbatim.
-     if len(history) == 0:
-         return [*system_messages]
--    return list(history)
-+
-+    # Subsequent turns: trim older messages to save tokens.
-+    trimmed_history = _trim_history(history)
-+    return trimmed_history
- 
- 
- def filter_tools(tools: list[Tool]) -> list[Tool]:
+ IDENTITY VERIFICATION (required before any account action):
+ - Verify the customer by confirming BOTH: (1) name on account, and (2) one of: email, zip code, or account/order ID.

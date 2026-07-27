@@ -1,77 +1,128 @@
---- a/target_agent/harness.py
-+++ b/target_agent/harness.py
-@@ -7,10 +7,18 @@
+--- a/target_agent/model_routing.py
++++ b/target_agent/model_routing.py
+@@ -1,21 +1,115 @@
+ """Model selection for TaskEvolveAgent.
+ 
+-The iterator (Milestone 2+) may modify this file to add:
+-- Cheap/strong routing based on turn count or confidence
+-- Per-task-type model selection
++Routing policy: most turns in these tasks are conversational overhead
++(greetings, identity verification, order lookup, 'yes proceed' confirmations)
++that do not require strong reasoning. We route such simple turns to the
++cheapest model (claude-haiku-4-5) and reserve stronger models for turns that
++involve genuine multi-item / decision reasoning.
+ """
  
  from __future__ import annotations
  
--from typing import Sequence
-+from typing import Sequence, List
  
- from tau2.data_model.message import Message, SystemMessage
- from tau2.environment.tool import Tool
++# Keywords that signal a genuinely complex, decision-heavy turn where we want
++# the strongest reasoning available. These correspond to multi-item choices,
++# refunds/cancellations, and ambiguous requests.
++_COMPLEX_KEYWORDS = (
++    "cancel",
++    "refund",
++    "exchange",
++    "return",
++    "replace",
++    "modify",
++    "change order",
++    "multiple",
++    "instead",
++    "however",
++    "but also",
++    "as well as",
++    "combine",
++    "discount",
++    "price adjust",
++    "which one",
++    "either",
++    "compare",
++)
 +
-+# ----------------------------------------------------------------------------------
-+# Internal state: we store the most-recent messages so `filter_tools` can reference
-+# conversation context without changing its public signature (the framework expects
-+# exactly `filter_tools(tools)`).
-+# ----------------------------------------------------------------------------------
-+_RECENT_MESSAGES: list[Message] | None = None
-+_RECENT_WINDOW = 4  # how many trailing messages to inspect for tool mentions
++
++def _text_of(msg) -> str:
++    """Best-effort extraction of textual content from a message object/dict."""
++    content = None
++    if isinstance(msg, dict):
++        content = msg.get("content")
++        role = msg.get("role")
++    else:
++        content = getattr(msg, "content", None)
++        role = getattr(msg, "role", None)
++    _ = role
++    if content is None:
++        return ""
++    if isinstance(content, str):
++        return content
++    # content may be a list of blocks
++    parts = []
++    try:
++        for block in content:
++            if isinstance(block, dict):
++                t = block.get("text") or block.get("content")
++                if isinstance(t, str):
++                    parts.append(t)
++            else:
++                t = getattr(block, "text", None)
++                if isinstance(t, str):
++                    parts.append(t)
++    except TypeError:
++        return str(content)
++    return " ".join(parts)
++
++
++def _last_user_text(history) -> str:
++    if not history:
++        return ""
++    for msg in reversed(history):
++        if isinstance(msg, dict):
++            role = msg.get("role")
++        else:
++            role = getattr(msg, "role", None)
++        if role == "user":
++            return _text_of(msg)
++    # fall back to last message text
++    return _text_of(history[-1])
++
++
+ def get_model(configured_model: str, history=None) -> str:
+     """Return the model to use for the current generation call.
  
- 
- def build_messages(
-@@ -19,16 +27,47 @@
- ) -> list[Message]:
-     """Return the full message list to pass to generate().
- 
--    M1: pass-through — system + history with no compression. This is the frozen
--    Arm A baseline; the iterator may add sliding-window or summary compression here.
-+    Arm A baseline +: we still return the raw list but also cache the last few
-+    messages so `filter_tools` can expose only the tools that are relevant to
-+    the immediate conversational context (hypothesis t2).
+-    ``history`` is the conversation so far (the agent passes ``state.messages``),
+-    so a routing policy can branch on context — e.g. a cheap model for simple
+-    early turns, a strong model for complex later ones. This baseline is the
+-    identity: it ignores ``history`` and always returns the configured model.
+-    The iterator (Exp 2) may rewrite this into a cost-aware routing policy over
+-    the allowed model pool.
++    Policy:
++    - If there is no history yet (first turn), use the configured model so the
++      task is set up with full capability.
++    - If the most recent user turn contains keywords signalling a complex,
++      multi-item or decision-heavy request, keep the configured (strong) model.
++    - Otherwise treat the turn as simple conversational overhead and route to
++      the cheapest model (haiku), which cuts per-token cost ~5x on the bulk of
++      turns while preserving success on trivial confirmation/lookup turns.
++
++    We never upgrade above the configured model, so this only ever reduces cost.
      """
--    return [*system_messages, *history]
-+    global _RECENT_MESSAGES
-+    full = [*system_messages, *history]
-+    # Cache only the tail of the conversation to keep memory small.
-+    _RECENT_MESSAGES = full[-_RECENT_WINDOW:]
-+    return full
+-    return configured_model
++    cheap_model = "anthropic/claude-haiku-4-5"
 +
++    # No context yet: keep configured strength for initial planning.
++    if not history:
++        return configured_model
 +
-+def _mentioned_tools(tools: List[Tool]) -> set[str]:
-+    """Return the lower-cased names of tools that are mentioned in recent msgs."""
-+    if not _RECENT_MESSAGES:
-+        return set()
++    text = _last_user_text(history).lower()
 +
-+    combined_text = "\n".join(
-+        (
-+            (getattr(m, "name", "") or "") + " " + (m.content or "")
-+            if hasattr(m, "content")
-+            else (getattr(m, "name", "") or "")
-+        )
-+        for m in _RECENT_MESSAGES
-+    ).lower()
++    # Complex/decision turn -> keep the strong configured model.
++    for kw in _COMPLEX_KEYWORDS:
++        if kw in text:
++            return configured_model
 +
-+    return {t.name for t in tools if t.name.lower() in combined_text}
- 
- 
- def filter_tools(tools: list[Tool]) -> list[Tool]:
--    """Return the tool list to expose to the LLM.
-+    """Expose only tools referenced in the recent conversation (hypothesis t2).
- 
--    M1: pass-through — all tools exposed unchanged.
--    Iterator can narrow the set or rewrite descriptions here.
-+    When none of the available tools are mentioned in the last few messages we
-+    fall back to returning the full catalogue, preventing accidental
-+    capability loss early in the dialogue.
-     """
--    return list(tools)
-+    # Defensive: if history unavailable, do no filtering.
-+    if not tools:
-+        return []
++    # If the configured model is already the cheap one, nothing to do.
++    if configured_model == cheap_model:
++        return configured_model
 +
-+    mentioned = _mentioned_tools(tools)
-+    if not mentioned:
-+        return list(tools)  # fallback – don't risk hiding everything
-+
-+    return [t for t in tools if t.name in mentioned]
++    # Simple conversational turn -> route to the cheapest model.
++    return cheap_model

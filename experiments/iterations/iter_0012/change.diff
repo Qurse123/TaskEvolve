@@ -1,0 +1,51 @@
+--- a/target_agent/harness.py
++++ b/target_agent/harness.py
+@@ -27,10 +27,45 @@
+     return [*system_messages, *history]
+ 
+ 
++# Substring that identifies the order-details lookup tool by name.
++_ORDER_DETAILS_TOOL = "get_order_details"
++
++# Appended to the get_order_details tool description to signal that multiple
++# lookups are independent and may be issued together in a single parallel batch
++# of tool calls, rather than one order at a time across separate turns.
++_PARALLEL_HINT = (
++    " This lookup is read-only and independent per order_id: when you need "
++    "details for several orders (e.g. a multi-order task), issue all the "
++    "get_order_details calls together in a single parallel batch in one turn "
++    "rather than fetching them sequentially across multiple turns."
++)
++
++
+ def filter_tools(tools: list[Tool]) -> list[Tool]:
+     """Return the tool list to expose to the LLM.
+ 
+-    M1: pass-through — all tools exposed unchanged.
+-    Iterator can narrow the set or rewrite descriptions here.
++    Rewrites only the ``get_order_details`` tool description to state that
++    lookups are independent and can be issued in a single parallel batch. This
++    targets the observed serial-lookup pattern (tasks 54/103/8/20 issuing 3-6
++    sequential get_order_details calls) at the tool-description level, without
++    touching the policy/system prompt or any verification behavior.
+     """
+-    return list(tools)
++    result: list[Tool] = []
++    for tool in tools:
++        name = getattr(tool, "name", None)
++        if name == _ORDER_DETAILS_TOOL:
++            current_desc = getattr(tool, "description", None) or ""
++            if _PARALLEL_HINT.strip() not in current_desc:
++                new_desc = current_desc.rstrip() + _PARALLEL_HINT
++                try:
++                    updated = tool.model_copy(update={"description": new_desc})
++                except AttributeError:
++                    try:
++                        tool.description = new_desc
++                        updated = tool
++                    except Exception:
++                        updated = tool
++                result.append(updated)
++                continue
++        result.append(tool)
++    return result

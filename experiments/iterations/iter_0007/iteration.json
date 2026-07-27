@@ -1,28 +1,28 @@
 {
   "iteration_id": "iter_0007",
-  "timestamp": "2026-07-19T00:16:09.998820+00:00",
+  "timestamp": "2026-07-25T18:12:35.905637+00:00",
   "harness_version": "v0.2",
   "changed_surface": "model_routing",
   "changed_file": "target_agent/model_routing.py",
-  "change_summary": "Route turns that follow a tool\u2192assistant\u2192user sequence to gpt-4.1-mini, as they are almost certainly pure JSON tool calls.",
-  "reason_for_change": "Pure tool-call turns (\u22481/3 per transcript, ~10 per task) are cheap to generate; routing only those (detected via tool\u2192assistant\u2192user pattern) to gpt-4.1-mini should cut ~30-40 % cost while keeping reasoning on gpt-4.1, so success rate stays unchanged.",
+  "change_summary": "Route only short pure yes/no confirmation turns (no pending tool decision) to claude-haiku-4-5; all other turns keep the configured model.",
+  "reason_for_change": "Confirmation-heavy tasks (transcripts 8, 103, 54) spend the strongest model on trivial 'Yes, please go ahead'-type turns that require no reasoning. Serving only exact short confirmation phrases with no tool call pending on haiku ($1/$5 vs opus $5/$25) cuts mean cost per task, while the strict phrase whitelist plus tool/decision exclusion keeps every reasoning and identity-decision turn on the configured model, protecting the success floor that the prior broader routing attempt breached.",
   "proxy_seeds": [
-    3325
+    5025
   ],
-  "proxy_task_success_before_mean": 0.625,
-  "proxy_task_success_before_std": 0.05892556509887891,
+  "proxy_task_success_before_mean": 0.7916666666666667,
+  "proxy_task_success_before_std": 0.05892556509887899,
   "proxy_task_success_after_mean": 0.6666666666666666,
   "proxy_task_success_after_std": 0.0,
-  "cost_per_successful_task_before": 0.063174125,
-  "cost_per_successful_task_after": 0.06726475,
+  "cost_per_successful_task_before": 0.6064168611111111,
+  "cost_per_successful_task_after": 0.7573637500000001,
   "accepted_or_rejected": "rejected",
-  "reason_accepted_or_rejected": "rejected: first proxy run did not improve \u2014 no cost improvement beyond noise: per-task cost 0.044843 >= threshold 0.037019 (best mean 0.039301 - 1\u03c3\u00b70.002281)",
-  "iterator_search_cost_usd": 0.0428,
+  "reason_accepted_or_rejected": "rejected: first proxy run did not improve \u2014 crossed success guardrail: pass_rate 0.6667 < floor 0.7521",
+  "iterator_search_cost_usd": 0.0685,
   "notes": "",
-  "editor_model": "o3",
-  "agent_model": "gpt-4.1",
-  "cost_per_task_before": 0.03930058333333333,
-  "cost_per_task_after": 0.04484316666666666,
+  "editor_model": "anthropic/claude-opus-4-8",
+  "agent_model": "anthropic/claude-opus-4-8",
+  "cost_per_task_before": 0.4795718750000001,
+  "cost_per_task_after": 0.5049091666666667,
   "ticket_id": "t3",
-  "hypothesis": "Routing all assistant turns whose sole goal is to issue a JSON tool call to gpt-4.1-mini will cut per-turn cost while keeping reasoning turns on gpt-4.1, sustaining accuracy."
+  "hypothesis": "The agent uses the strongest configured model for the many trivial verification/confirmation turns (e.g. 'Yes, please go ahead', identity re-verification retries in task 54); routing only pure yes/no confirmation turns to claude-haiku while keeping the configured model for any turn containing a tool call or multi-item decision will cut cost without touching reasoning-heavy steps."
 }
