@@ -34,9 +34,9 @@ BEST = Distribution(
     cost_per_task_std=0.01,
 )
 
-# floor = 0.95 * 0.6 = 0.57; no cost/invalid ceilings.
+# absolute success floor 0.55; no cost/invalid ceilings.
 GUARDRAILS = Guardrails(
-    task_success_floor_frac_of_best=0.95,
+    absolute_success_floor=0.55,
     max_cost_per_successful_task_usd=None,
     max_invalid_action_rate=None,
 )
@@ -45,7 +45,7 @@ GUARDRAILS = Guardrails(
 def test_load_guardrails_reads_real_yaml():
     g = load_guardrails()
 
-    assert g.task_success_floor_frac_of_best == 0.95
+    assert g.absolute_success_floor == 0.5
     assert g.max_cost_per_successful_task_usd is None
     assert g.max_invalid_action_rate is None
     assert g.accept_margin_sigma == 1.0
@@ -54,7 +54,7 @@ def test_load_guardrails_reads_real_yaml():
 def test_margin_rejects_improvement_within_one_sigma_of_noise():
     # best mean 0.09, std 0.01 -> with a 1σ margin the threshold is 0.08.
     guardrails = Guardrails(
-        task_success_floor_frac_of_best=0.95,
+        absolute_success_floor=0.55,
         max_cost_per_successful_task_usd=None,
         max_invalid_action_rate=None,
         accept_margin_sigma=1.0,
@@ -71,7 +71,7 @@ def test_margin_rejects_improvement_within_one_sigma_of_noise():
 def test_zero_margin_keeps_legacy_below_mean_rule():
     # Default margin 0.0 accepts anything strictly below the mean (legacy behavior).
     legacy = Guardrails(
-        task_success_floor_frac_of_best=0.95,
+        absolute_success_floor=0.55,
         max_cost_per_successful_task_usd=None,
         max_invalid_action_rate=None,
     )
@@ -88,7 +88,7 @@ def test_run_that_lowers_cost_and_holds_success_passes():
 
 
 def test_run_below_success_floor_fails():
-    run = RunMetrics(pass_rate=0.5, cost_per_successful_task=0.08, cost_per_task=0.08)  # 0.5 < 0.57 floor
+    run = RunMetrics(pass_rate=0.5, cost_per_successful_task=0.08, cost_per_task=0.08)  # 0.5 < 0.55 floor
 
     check = check_run(run, BEST, GUARDRAILS)
 
@@ -110,7 +110,7 @@ def test_cost_ceiling_guardrail_blocks_even_when_improved():
         pass_rate=0.6, cost_per_successful_task=0.088
     )  # < 0.09 best, > 0.085 ceiling
     guardrails = Guardrails(
-        task_success_floor_frac_of_best=0.95,
+        absolute_success_floor=0.55,
         max_cost_per_successful_task_usd=0.085,
         max_invalid_action_rate=None,
     )
@@ -189,7 +189,7 @@ def test_run_without_harness_errors_unaffected_by_new_field():
 # cost across runs below the same mu - k*sigma threshold. Same bar, more power.
 
 MARGIN_GUARDRAILS = Guardrails(
-    task_success_floor_frac_of_best=0.95,
+    absolute_success_floor=0.55,
     max_cost_per_successful_task_usd=None,
     max_invalid_action_rate=None,
     accept_margin_sigma=1.0,  # threshold = 0.09 - 0.01 = 0.08
