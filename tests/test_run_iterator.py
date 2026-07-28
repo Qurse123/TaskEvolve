@@ -42,7 +42,7 @@ def _best() -> Distribution:
 
 def _guardrails() -> Guardrails:
     return Guardrails(
-        task_success_floor_frac_of_best=0.95,
+        absolute_success_floor=0.55,
         max_cost_per_successful_task_usd=None,
         max_invalid_action_rate=None,
     )

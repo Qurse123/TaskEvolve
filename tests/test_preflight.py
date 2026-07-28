@@ -74,7 +74,8 @@ def test_syntax_error_fails(tmp_path: Path) -> None:
 
 
 def test_disallowed_model_fails(tmp_path: Path) -> None:
-    # The editor's contract restricts routing to gpt-4.1 / gpt-4.1-mini.
+    # The agent may only run on the Anthropic pool (Opus 4.8 / Sonnet 5 / Haiku 4.5);
+    # an off-pool model must be rejected at $0.
     root = _candidate_tree(tmp_path)
     (root / "target_agent" / "model_routing.py").write_text(
         "def get_model(configured_model, history=None):\n"
@@ -89,8 +90,8 @@ def test_disallowed_model_fails(tmp_path: Path) -> None:
 
 
 def test_routing_off_pool_on_later_turn_fails(tmp_path: Path) -> None:
-    # Exp 2: get_model is exercised with a multi-turn history too, so a policy that
-    # returns an off-pool model only on later turns is still caught at $0.
+    # Exp 2 (Anthropic pool): get_model is exercised with a multi-turn history too, so
+    # a policy that returns an off-pool model only on later turns is still caught at $0.
     root = _candidate_tree(tmp_path)
     (root / "target_agent" / "model_routing.py").write_text(
         "def get_model(configured_model, history=None):\n"
