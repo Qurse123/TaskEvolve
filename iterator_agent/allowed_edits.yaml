@@ -32,14 +32,20 @@ forbidden_paths:
 # iterator_agent/acceptance.py (NOT by edit_guard.py). The iterator may not
 # modify these mid-run.
 guardrails:
-  # A change must keep proxy task success at or above this fraction of the
-  # current-best proxy mean (experiment.md §11.2 example: 0.95).
-  task_success_floor_frac_of_best: 0.95
+  # ABSOLUTE task-success floor (anti-gaming): a candidate whose proxy success
+  # falls below this is rejected regardless of how cheap it is. This is NOT a
+  # fraction of the current best — the study optimizes a cost-vs-precision
+  # frontier, so a cheaper point with somewhat lower success is a legitimate
+  # tradeoff to keep, provided it stays above this floor and improves cost per
+  # successful task. Explicit + adjustable (was a hidden 0.95×best relative floor
+  # that structurally rejected every tradeoff).
+  absolute_success_floor: 0.5
   # Cost / quality ceilings; null = declared but not yet enforced.
   max_cost_per_successful_task_usd: null
   max_invalid_action_rate: null
   # Noise floor (experiment.md §20): a candidate run must beat the current-best
-  # MEAN COST PER TASK by at least this many standard deviations of the best
-  # distribution. The per-task objective has a fixed denominator (~5% seed CV),
-  # so real token savings clear this margin while lucky 2-seed draws do not.
+  # MEAN COST PER SUCCESSFUL TASK by at least this many standard deviations of the
+  # best distribution, so a lucky 2-seed draw within benchmark seed noise cannot
+  # be accepted. The near-miss extension spends extra seeds when a run beats the
+  # mean but misses this margin.
   accept_margin_sigma: 1.0

@@ -15,3 +15,11 @@ experiments/*.db
 
 # Bulky per-run console logs (regenerable; verdicts live in experiments/iterations + results.csv)
 experiments/*.log
+
+# Iterator run artifacts (regenerable; committing them collides across experiment
+# branches — the recurring PR-conflict source). Provenance lives in branch history.
+experiments/iterations/
+experiments/accepted_changes.md
+experiments/rejected_changes.md
+# Archived contaminated runs/plots (kept locally for reference, not committed).
+experiments/archive_contaminated/
