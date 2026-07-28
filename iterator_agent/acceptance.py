@@ -1,15 +1,20 @@
 """Acceptance rule — the iterator's deterministic comparator (experiment.md §20-21).
 
 No LLM. A candidate harness change is accepted iff BOTH of its proxy runs
-**improve** the optimization objective (mean ``cost_per_task`` below the
-current-best mean by the noise margin) AND **clear every guardrail** (success
-floor + optional cost / invalid-action ceilings declared in
+**improve** the optimization objective (mean ``cost_per_successful_task`` below
+the current-best mean by the noise margin) AND **clear every guardrail** (an
+absolute success floor + optional cost / invalid-action ceilings declared in
 ``allowed_edits.yaml``). Otherwise the change is reverted.
 
-The objective is mean cost per task (fixed denominator, ~5% seed CV) rather than
-cost-per-successful-task (~19% CV — the pass-count denominator injects success
-noise into the cost signal, hiding real token savings). Success is protected by
-the floor guardrail; cost-per-successful-task remains the *reported* headline.
+Objective = **cost per successful task** (cost ÷ success). This single scalar
+*is* the cost-vs-precision tradeoff the study optimizes: lowering it means the
+agent got cheaper, more successful, or struck a favorable trade. A change that
+tanks success raises the metric and self-rejects; a genuine cost cut — token
+savings OR a cheaper model that holds up — lowers it and is accepted. This
+replaces the earlier single-objective rule (mean cost per task at a *relative*
+0.95×best success floor), which structurally rejected every cost-for-precision
+tradeoff — the frontier is multi-objective, so success is now only a **low
+absolute floor** (anti-gaming), not a moving target pinned to the current best.
 """
 
 from __future__ import annotations
@@ -53,7 +58,12 @@ class RunMetrics:
 class Guardrails:
     """Acceptance guardrails declared in allowed_edits.yaml (frozen for the run)."""
 
-    task_success_floor_frac_of_best: float
+    # Absolute task-success floor (anti-gaming): a candidate whose proxy success
+    # drops below this is rejected no matter how cheap it is. Absolute, NOT a
+    # fraction of the current best — the frontier is multi-objective, so a cheaper
+    # point with somewhat lower success is a legitimate tradeoff to keep, provided
+    # it stays above this floor and improves cost per successful task.
+    absolute_success_floor: float
     max_cost_per_successful_task_usd: Optional[float]
     max_invalid_action_rate: Optional[float]
     # Noise floor: a run must beat the current-best cost mean by at least this many
@@ -88,13 +98,11 @@ def load_guardrails(path: Union[str, Path] = DEFAULT_POLICY_PATH) -> Guardrails:
     """Load the acceptance guardrails block from the edit-policy YAML."""
     data = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
     block = data.get("guardrails") or {}
-    floor = block.get("task_success_floor_frac_of_best")
+    floor = block.get("absolute_success_floor")
     if floor is None:
-        raise ValueError(
-            f"guardrails.task_success_floor_frac_of_best missing from {path}"
-        )
+        raise ValueError(f"guardrails.absolute_success_floor missing from {path}")
     return Guardrails(
-        task_success_floor_frac_of_best=float(floor),
+        absolute_success_floor=float(floor),
         max_cost_per_successful_task_usd=_opt_float(
             block.get("max_cost_per_successful_task_usd")
         ),
@@ -116,12 +124,14 @@ def _check_guardrails(
             "(harness_error) — the change breaks the harness",
         )
 
-    # Guardrail: task-success floor (a fraction of the current-best mean).
-    floor = guardrails.task_success_floor_frac_of_best * best.pass_rate_mean
+    # Guardrail: absolute task-success floor (anti-gaming). Not a fraction of the
+    # current best — a cheaper point with somewhat lower success is a valid
+    # frontier tradeoff as long as it clears this absolute floor.
+    floor = guardrails.absolute_success_floor
     if run.pass_rate < floor:
         return RunCheck(
             False,
-            f"crossed success guardrail: pass_rate {run.pass_rate:.4f} < floor {floor:.4f}",
+            f"crossed success guardrail: pass_rate {run.pass_rate:.4f} < absolute floor {floor:.4f}",
         )
 
     # Guardrail: cost-per-successful-task ceiling (if set and reported).
@@ -152,11 +162,11 @@ def _check_guardrails(
 
 
 def _threshold(best: Distribution, guardrails: Guardrails) -> Optional[float]:
-    """The accept threshold μ - kσ on mean cost per task (None without a baseline)."""
-    if best.cost_per_task_mean is None:
+    """The accept threshold μ - kσ on cost per successful task (None without a baseline)."""
+    if best.cost_per_successful_task_mean is None:
         return None
-    sigma = best.cost_per_task_std or 0.0
-    return best.cost_per_task_mean - guardrails.accept_margin_sigma * sigma
+    sigma = best.cost_per_successful_task_std or 0.0
+    return best.cost_per_successful_task_mean - guardrails.accept_margin_sigma * sigma
 
 
 def check_run(run: RunMetrics, best: Distribution, guardrails: Guardrails) -> RunCheck:
@@ -165,29 +175,31 @@ def check_run(run: RunMetrics, best: Distribution, guardrails: Guardrails) -> Ru
     if not guard.passed:
         return guard
 
-    # Improvement on the objective: mean cost per task strictly lower. Success is
-    # a guardrail *floor*, so the objective deliberately excludes the noisy
-    # pass-count denominator; cost-per-successful-task stays the reported headline.
+    # Improvement on the objective: cost per successful task strictly lower. This
+    # scalar folds cost and precision together (cost ÷ success), so a change that
+    # trades success for cost only wins if the trade is net-favorable.
     threshold = _threshold(best, guardrails)
     if threshold is None:
         return RunCheck(
-            False, "cannot judge improvement: best has no per-task cost baseline"
+            False, "cannot judge improvement: best has no cost-per-successful-task baseline"
         )
-    if run.cost_per_task is None:
-        return RunCheck(False, "no cost improvement: run reported no per-task cost")
+    if run.cost_per_successful_task is None:
+        return RunCheck(
+            False, "no cost improvement: run reported no cost per successful task"
+        )
     # Improvement must clear the current-best mean by a noise margin (μ - kσ), so a
     # single lucky 2-seed draw within the benchmark's seed noise cannot be accepted.
-    if not (run.cost_per_task < threshold):
-        sigma = best.cost_per_task_std or 0.0
+    if not (run.cost_per_successful_task < threshold):
+        sigma = best.cost_per_successful_task_std or 0.0
         return RunCheck(
             False,
-            f"no cost improvement beyond noise: per-task cost {run.cost_per_task:.6f} "
-            f">= threshold {threshold:.6f} "
-            f"(best mean {best.cost_per_task_mean:.6f} "
+            f"no cost improvement beyond noise: cost/successful-task "
+            f"{run.cost_per_successful_task:.6f} >= threshold {threshold:.6f} "
+            f"(best mean {best.cost_per_successful_task_mean:.6f} "
             f"- {guardrails.accept_margin_sigma:g}σ·{sigma:.6f})",
         )
 
-    return RunCheck(True, "improved mean cost per task within all guardrails")
+    return RunCheck(True, "improved cost per successful task within all guardrails")
 
 
 def near_miss(run: RunMetrics, best: Distribution, guardrails: Guardrails) -> bool:
@@ -195,9 +207,9 @@ def near_miss(run: RunMetrics, best: Distribution, guardrails: Guardrails) -> bo
     (whether or not it clears the noise margin) — the pattern worth extra seeds."""
     if not _check_guardrails(run, best, guardrails).passed:
         return False
-    if best.cost_per_task_mean is None or run.cost_per_task is None:
+    if best.cost_per_successful_task_mean is None or run.cost_per_successful_task is None:
         return False
-    return run.cost_per_task < best.cost_per_task_mean
+    return run.cost_per_successful_task < best.cost_per_successful_task_mean
 
 
 def evaluate_candidate(
@@ -227,13 +239,13 @@ def evaluate_candidate(
     if not failed:
         return AcceptanceDecision(
             True,
-            f"accepted: all {len(checks)} proxy runs improved mean cost per task within guardrails",
+            f"accepted: all {len(checks)} proxy runs improved cost per successful task within guardrails",
             checks,
         )
 
     if len(runs) >= 3:
         threshold = _threshold(best, guardrails)
-        costs = [r.cost_per_task for r in runs]
+        costs = [r.cost_per_successful_task for r in runs]
         if (
             threshold is not None
             and all(near_miss(r, best, guardrails) for r in runs)
@@ -242,7 +254,7 @@ def evaluate_candidate(
         ):
             return AcceptanceDecision(
                 True,
-                f"accepted (near-miss extension): mean per-task cost over {len(runs)} runs "
+                f"accepted (near-miss extension): mean cost/successful-task over {len(runs)} runs "
                 f"{statistics.mean(costs):.6f} < threshold {threshold:.6f}, "  # type: ignore[arg-type]
                 "every run below the current-best mean within guardrails",
                 checks,
