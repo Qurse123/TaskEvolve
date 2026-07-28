@@ -52,7 +52,7 @@ def _best(cost: float = 0.083, pass_rate: float = 0.583) -> Distribution:
 
 def _guardrails() -> Guardrails:
     return Guardrails(
-        task_success_floor_frac_of_best=0.95,
+        absolute_success_floor=0.55,
         max_cost_per_successful_task_usd=None,
         max_invalid_action_rate=None,
     )
@@ -519,7 +519,7 @@ def test_default_eval_seed_raises_on_subprocess_failure(monkeypatch) -> None:
 def _margin_guardrails() -> Guardrails:
     # best cost mean 0.083, std 0.016 -> threshold 0.067; near-miss band [0.067, 0.083)
     return Guardrails(
-        task_success_floor_frac_of_best=0.95,
+        absolute_success_floor=0.55,
         max_cost_per_successful_task_usd=None,
         max_invalid_action_rate=None,
         accept_margin_sigma=1.0,

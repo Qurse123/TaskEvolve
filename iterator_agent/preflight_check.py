@@ -10,7 +10,8 @@ surface the way the real agent uses it, at $0 (no LLM, no benchmark):
      long conversation (system + 30 messages incl. tool traffic) and verify it
      returns tau2 Message instances; call ``filter_tools``.
   3. Import ``target_agent.model_routing``; ``get_model`` must return an
-     allowed agent model (the editor's contract: gpt-4.1 / gpt-4.1-mini).
+     allowed agent model (the editor's contract: a single model from the
+     Anthropic pool — Opus 4.8 / Sonnet 5 / Haiku 4.5).
   4. Render the prompt templates exactly as ``target_agent.agent`` does
      (StrictUndefined), so an undefined variable or Jinja error fails here.
 
@@ -24,13 +25,14 @@ import json
 import sys
 from pathlib import Path
 
-# The editor may only route the agent to these models (see prompts/*.j2).
-# Exp 2 cost-aware routing over the Anthropic pool: Opus 4.8 ($5/$25 per 1M,
-# strongest), Sonnet 5 ($2/$10, mid), Haiku 4.5 ($1/$5, cheapest/fastest).
+# The agent may run on exactly one of these models (see prompts/*.j2). model_routing
+# picks a single model for the WHOLE agent (no per-turn/keyword routing).
+# Exp 2 Anthropic pool: Opus 4.8 ($5/$25 per 1M, strongest), Sonnet 5 ($2/$10, mid),
+# Haiku 4.5 ($1/$5, cheapest/fastest).
 ALLOWED_AGENT_MODELS = (
     "anthropic/claude-opus-4-8",
     "anthropic/claude-sonnet-5",
-    "anthropic/claude-haiku-4-5",
+    "anthropic/claude-haiku-4-5-20251001",
 )
 
 PYTHON_SURFACES = (
@@ -130,8 +132,8 @@ def _check_model_routing() -> None:
         raise RuntimeError("target_agent/model_routing.py must define get_model()")
     configured = ALLOWED_AGENT_MODELS[0]
     # Exercise the exact call agent.py makes — get_model(configured, history) —
-    # across the contexts a routing policy might branch on (empty + multi-turn),
-    # so a policy that returns an off-pool model on some turn is caught at $0.
+    # with both an empty and a realistic multi-turn history, so any code path that
+    # returns an off-pool model (on any input) is caught at $0.
     for history in ([], _synthetic_history()):
         try:
             model = routing.get_model(configured, history)
