@@ -11,11 +11,12 @@ from __future__ import annotations
 def get_model(configured_model: str, history=None) -> str:
     """Return the model to use for the current generation call.
 
-    ``history`` is the conversation so far (the agent passes ``state.messages``),
-    so a routing policy can branch on context — e.g. a cheap model for simple
-    early turns, a strong model for complex later ones. This baseline is the
-    identity: it ignores ``history`` and always returns the configured model.
-    The iterator (Exp 2) may rewrite this into a cost-aware routing policy over
-    the allowed model pool.
+    Routing policy: the retail tasks are dominated by mechanical tool
+    sequences (get_order_details, exchange/return flows) with explicit user
+    confirmations, so the reasoning demands are low. We return a single mid
+    model (sonnet-5) for the WHOLE agent. This cuts per-token price ~2.5x on
+    both input and output versus opus, which multiplies directly into
+    cost-per-successful-task since cost is dominated by token volume across
+    many turns.
     """
-    return configured_model
+    return "anthropic/claude-sonnet-5"
