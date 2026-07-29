@@ -133,16 +133,28 @@ def _short_model(agent_model: str) -> str:
     return agent_model.rsplit("/", 1)[-1]
 
 
+# Harness versions whose model_routing.get_model overrides the configured base
+# model, so the recorded agent_model (the base) is not what actually ran. Maps to
+# the effective model label for the legend. v0.2 = the iterator's accepted swap:
+# base Opus, get_model returns Sonnet 5 unconditionally (whole agent).
+_ROUTING_HARNESS_MODEL = {"v0.2": "Opus->Sonnet5"}
+
+
 def _arm_label(row: Dict[str, str]) -> str:
     """Arm identity for grouping/legend: split / harness / model.
 
     The model tag is what keeps Arm A (gpt-4.1) and Arm C (Inkling) — which share
     a split and the static v0.1 harness — from collapsing into one cloud. Omitted
-    for rows that predate the agent_model column (backward compatible).
+    for rows that predate the agent_model column (backward compatible). For a
+    routing harness (``_ROUTING_HARNESS_MODEL``) the tag shows the *effective*
+    routed model, not the recorded base.
     """
     base = f"{row.get('split', '?')} / {row.get('harness_version', '?')}"
     model = row.get("agent_model")
-    return f"{base} / {_short_model(model)}" if model else base
+    if not model:
+        return base
+    tag = _ROUTING_HARNESS_MODEL.get(row.get("harness_version", ""), _short_model(model))
+    return f"{base} / {tag}"
 
 
 def plot_per_metric(
