@@ -1,0 +1,335 @@
+"""Tinker LoRA training loop for Arm D.
+
+Turns `arm_d.build_dataset.TrainingExample`s into Tinker datums (via an injected
+renderer) and runs a LoRA fine-tune with early-stop on a by-task holdout slice
+of the *training* set. The Tinker client and the renderer are both injected
+callables (`client_factory`, `renderer`) so `train()`'s loop logic — holdout
+split, epoch loop, early stopping, cost/record logging — is fully unit-testable
+at $0 with a fake client. `_default_client_factory` / `build_default_renderer`
+wire the real `tinker` + `tinker_cookbook` symbols pinned in the Task 1 spike
+note (docs/superpowers/notes/2026-08-03-arm-d-tinker-serving-decision.md) but
+are never invoked by the tests — only reachable by real-usage callers.
+"""
+from __future__ import annotations
+
+import json
+import random
+import shutil
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Callable
+
+from arm_d.build_dataset import TrainingExample
+
+# Fallback per-step training cost (USD) when the client exposes no billing/
+# telemetry surface. 0.0 by default — documented placeholder, not a real price,
+# per decision note §3 ("record step count x a documented per-step rate").
+# Real-usage callers should set TrainConfig.cost_per_step_usd once Tinker's
+# billing API (sc.get_telemetry() / tinker.types.BillingUsageResponse) is
+# confirmed against a live run.
+DEFAULT_COST_PER_STEP_USD = 0.0
+
+# `forward_backward`'s loss_fn identifier. UNCONFIRMED against the live Tinker
+# API — decision note §1/§6 marks the exact renderer name + round-trip as a
+# PAID/DEFERRED item. Update once a live create_lora_training_client +
+# forward_backward call confirms the correct value.
+DEFAULT_LOSS_FN = "cross_entropy"
+
+
+@dataclass
+class TrainConfig:
+    base_model: str = "thinkingmachines/Inkling"
+    lora_rank: int = 32
+    lr: float = 1e-4
+    max_epochs: int = 3
+    patience: int = 1
+    # See DEFAULT_COST_PER_STEP_USD above.
+    cost_per_step_usd: float = DEFAULT_COST_PER_STEP_USD
+
+
+@dataclass
+class TrainResult:
+    checkpoint: str
+    sampling_client: Any
+    training_cost_usd: float
+    steps: int
+    best_holdout_loss: float
+
+
+def split_holdout(
+    examples: list[TrainingExample], *, frac: float = 0.15, seed: int = 0
+) -> tuple[list[TrainingExample], list[TrainingExample]]:
+    """Split examples into (train, holdout) by task_id — no task appears on both
+    sides. Holdout size is `round(len(task_ids) * frac)`, clamped to at least 1
+    (when there is more than one task) and to leave at least one training task."""
+    task_ids = sorted({e.task_id for e in examples})
+    if not task_ids:
+        return [], []
+    rng = random.Random(seed)
+    rng.shuffle(task_ids)
+    max_holdout = max(0, len(task_ids) - 1)  # always keep >=1 training task
+    n_holdout = min(max(1, round(len(task_ids) * frac)), max_holdout) if max_holdout else 0
+    holdout_ids = set(task_ids[:n_holdout])
+    train = [e for e in examples if e.task_id not in holdout_ids]
+    holdout = [e for e in examples if e.task_id in holdout_ids]
+    return train, holdout
+
+
+def _block(value: Any) -> Any:
+    """Resolve a Tinker `APIFuture` (real API: call `.result()` to block) or pass
+    a plain value through unchanged (the fake test client, which returns dicts/
+    None directly). Lets the same loop code work against both."""
+    result_fn = getattr(value, "result", None)
+    return result_fn() if callable(result_fn) else value
+
+
+def _extract_loss(result: Any) -> float:
+    """Best-effort loss extraction from a forward_backward result. The fake test
+    client returns `{"loss": v}`; the real API's exact result shape isn't pinned
+    (decision note doesn't specify it), so this also tries a `.loss` /
+    `.metrics["loss"]` attribute for forward compatibility, falling back to 0.0."""
+    if isinstance(result, dict):
+        if "loss" in result:
+            return float(result["loss"])
+        metrics = result.get("metrics")
+        if isinstance(metrics, dict) and "loss" in metrics:
+            return float(metrics["loss"])
+        return 0.0
+    loss = getattr(result, "loss", None)
+    if loss is not None:
+        return float(loss)
+    metrics = getattr(result, "metrics", None)
+    if isinstance(metrics, dict) and "loss" in metrics:
+        return float(metrics["loss"])
+    return 0.0
+
+
+def _extract_cost(telemetry: Any) -> float | None:
+    if telemetry is None:
+        return None
+    if isinstance(telemetry, dict):
+        for key in ("total_cost_usd", "cost_usd", "cost"):
+            if key in telemetry:
+                return float(telemetry[key])
+        return None
+    for attr in ("total_cost_usd", "cost_usd", "cost"):
+        val = getattr(telemetry, attr, None)
+        if val is not None:
+            return float(val)
+    return None
+
+
+def _training_cost(client: Any, steps: int, cfg: TrainConfig) -> tuple[float, str]:
+    """§15.3: read training cost from client/service billing telemetry when
+    exposed; else fall back to steps * cfg.cost_per_step_usd (documented rate,
+    kept separate from runtime token cost). The fake test client exposes no
+    telemetry, so tests always take the fallback path (cost 0.0 by default)."""
+    get_telemetry = getattr(client, "get_telemetry", None)
+    if callable(get_telemetry):
+        try:
+            cost = _extract_cost(get_telemetry())
+        except Exception:
+            cost = None
+        if cost is not None:
+            return float(cost), "from client.get_telemetry()"
+    return steps * cfg.cost_per_step_usd, (
+        f"no billing telemetry exposed; fallback = steps * cost_per_step_usd "
+        f"({cfg.cost_per_step_usd})"
+    )
+
+
+def train(
+    examples: list[TrainingExample],
+    cfg: TrainConfig,
+    *,
+    client_factory: Callable[[TrainConfig], Any],
+    renderer: Callable[[TrainingExample], Any],
+    log_dir: str | Path,
+    manifest_path: str | Path | None = None,
+    holdout_frac: float = 0.15,
+    holdout_seed: int = 0,
+) -> TrainResult:
+    """Run the LoRA training loop.
+
+    Splits `examples` by task_id into train/holdout (`split_holdout`), then for
+    up to `cfg.max_epochs` epochs: renders the train split into a batch, calls
+    `client.forward_backward(batch)` + `client.optim_step()` (one step/epoch),
+    renders + scores the holdout split the same way, and early-stops once
+    holdout loss fails to improve for `cfg.patience` consecutive epochs. Saves
+    the adapter via `client.save_weights_and_get_sampling_client(name=...)` and
+    writes `log_dir/training_record.json` (cost, steps, best holdout loss, every
+    `TrainConfig` field, timestamp). If `manifest_path` is given and exists, it
+    is copied into `log_dir` alongside the record.
+    """
+    log_dir = Path(log_dir)
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    train_examples, holdout_examples = split_holdout(
+        examples, frac=holdout_frac, seed=holdout_seed
+    )
+
+    client = client_factory(cfg)
+
+    steps = 0
+    best_holdout_loss = float("inf")
+    epochs_without_improvement = 0
+    last_train_loss = 0.0
+
+    for _epoch in range(cfg.max_epochs):
+        train_batch = [renderer(ex) for ex in train_examples]
+        fb_result = _block(client.forward_backward(train_batch))
+        last_train_loss = _extract_loss(fb_result)
+        _block(client.optim_step())
+        steps += 1
+
+        if holdout_examples:
+            holdout_batch = [renderer(ex) for ex in holdout_examples]
+            ho_result = _block(client.forward_backward(holdout_batch))
+            holdout_loss = _extract_loss(ho_result)
+        else:
+            # Degenerate case (too few distinct tasks for a holdout slice):
+            # fall back to train loss so early-stop still has a signal.
+            holdout_loss = last_train_loss
+
+        if holdout_loss < best_holdout_loss - 1e-9:
+            best_holdout_loss = holdout_loss
+            epochs_without_improvement = 0
+        else:
+            epochs_without_improvement += 1
+            if epochs_without_improvement >= cfg.patience:
+                break
+
+    checkpoint_name = f"arm-d-{Path(cfg.base_model).name.lower()}-lora-{log_dir.name}"
+    sampling_client = client.save_weights_and_get_sampling_client(name=checkpoint_name)
+
+    training_cost_usd, cost_note = _training_cost(client, steps, cfg)
+
+    record = {
+        **asdict(cfg),
+        "steps": steps,
+        "best_holdout_loss": best_holdout_loss,
+        "training_cost_usd": training_cost_usd,
+        "cost_note": cost_note,
+        "checkpoint": checkpoint_name,
+        "num_train_examples": len(train_examples),
+        "num_holdout_examples": len(holdout_examples),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    (log_dir / "training_record.json").write_text(json.dumps(record, indent=2))
+
+    if manifest_path is not None:
+        manifest_path = Path(manifest_path)
+        if manifest_path.exists():
+            shutil.copy2(manifest_path, log_dir / manifest_path.name)
+
+    return TrainResult(
+        checkpoint=checkpoint_name,
+        sampling_client=sampling_client,
+        training_cost_usd=training_cost_usd,
+        steps=steps,
+        best_holdout_loss=best_holdout_loss,
+    )
+
+
+# --------------------------------------------------------------------------
+# Real-usage defaults (Task 1 spike note). Never imported/invoked by the unit
+# tests — only reachable by a real caller that wires these in explicitly.
+# --------------------------------------------------------------------------
+
+
+class _RealTrainingClientAdapter:
+    """Adapts a live `tinker.TrainingClient` to the same call shape `train()`'s
+    loop uses against the fake test client: `forward_backward(batch)` (no
+    `loss_fn` arg), `optim_step()` (no `AdamParams` arg), and
+    `save_weights_and_get_sampling_client(name=...)`. This hides the extra
+    arguments the real SDK requires (decision note §1) behind the injected
+    seam instead of branching the loop on real-vs-fake."""
+
+    def __init__(self, tc: Any, *, lr: float, loss_fn: str = DEFAULT_LOSS_FN):
+        self.tc = tc
+        self._lr = lr
+        self._loss_fn = loss_fn
+
+    def forward_backward(self, batch: list[Any]) -> Any:
+        return self.tc.forward_backward(data=batch, loss_fn=self._loss_fn)
+
+    def optim_step(self) -> Any:
+        import tinker
+
+        return self.tc.optim_step(tinker.AdamParams(learning_rate=self._lr))
+
+    def save_weights_and_get_sampling_client(self, name: str | None = None) -> Any:
+        return self.tc.save_weights_and_get_sampling_client(name=name)
+
+    def get_tokenizer(self) -> Any:
+        return self.tc.get_tokenizer()
+
+
+def _default_client_factory(cfg: TrainConfig) -> _RealTrainingClientAdapter:
+    """Builds the real Tinker LoRA training client (decision note §1):
+    `tinker.ServiceClient().create_lora_training_client(base_model=..., rank=...)`,
+    wrapped in `_RealTrainingClientAdapter` for the shared loop's call shape.
+    """
+    import tinker
+
+    sc = tinker.ServiceClient()
+    tc = sc.create_lora_training_client(base_model=cfg.base_model, rank=cfg.lora_rank)
+    return _RealTrainingClientAdapter(tc, lr=cfg.lr)
+
+
+def _to_cookbook_messages(messages: list[dict]) -> list[dict]:
+    """Maps `arm_d.build_dataset`'s normalized `{role, content, tool_calls}`
+    messages to `tinker_cookbook.renderers.Message` TypedDicts (decision note
+    §2's mapping). Passes through `tool_call_id`/`name` when present, though
+    `build_dataset._normalize` currently only preserves role/content/tool_calls
+    — a gap in the upstream normalizer, not fixed here (build_dataset is a
+    frozen, already-shipped module; flagged in the report instead)."""
+    out = []
+    for m in messages:
+        msg: dict = {"role": m.get("role"), "content": m.get("content")}
+        if m.get("tool_calls"):
+            msg["tool_calls"] = m["tool_calls"]
+        if m.get("tool_call_id"):
+            msg["tool_call_id"] = m["tool_call_id"]
+        if m.get("name"):
+            msg["name"] = m["name"]
+        out.append(msg)
+    return out
+
+
+def build_default_renderer(
+    cfg: TrainConfig,
+    tc: Any,
+    *,
+    renderer_name: str,
+    max_length: int = 4096,
+) -> Callable[[TrainingExample], Any]:
+    """Real-usage renderer builder (decision note §2): resolves the cookbook
+    renderer via `renderers.get_renderer(renderer_name, tc.get_tokenizer(),
+    model_name=cfg.base_model)` and returns a callable
+    `renderer(example) -> tinker.Datum` via `supervised.conversation_to_datum(
+    ..., train_on_what=ALL_ASSISTANT_MESSAGES)` — the assistant-only loss mask
+    is a library concern, not hand-built (per the note).
+
+    `renderer_name` has no hardcoded guess: the decision note marks the exact
+    renderer name for `thinkingmachines/Inkling` as a PAID/DEFERRED item (§6.1)
+    that only a live round-trip can confirm. `tc` is the raw TrainingClient
+    (e.g. `_default_client_factory(cfg).tc`), not the adapter, since only the
+    raw client's `get_tokenizer()` is needed here.
+    """
+    from tinker_cookbook import renderers, supervised
+
+    tok = tc.get_tokenizer()
+    cb_renderer = renderers.get_renderer(renderer_name, tok, model_name=cfg.base_model)
+
+    def _renderer(example: TrainingExample) -> Any:
+        conversation = _to_cookbook_messages(example.messages)
+        return supervised.conversation_to_datum(
+            conversation,
+            cb_renderer,
+            max_length,
+            train_on_what=renderers.TrainOnWhat.ALL_ASSISTANT_MESSAGES,
+        )
+
+    return _renderer
