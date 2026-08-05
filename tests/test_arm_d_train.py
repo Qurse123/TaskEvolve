@@ -33,3 +33,24 @@ def test_train_logs_cost_and_stops_early(tmp_path):
     assert res.steps >= 1
     assert (tmp_path / "training_record.json").exists()
     assert res.training_cost_usd >= 0.0
+
+
+def test_inkling_renderer_name_pinned_to_tml_v0():
+    """The Inkling renderer name is resolved at $0 from the cookbook's model
+    table (not a live round-trip). Lock it so an SDK bump that changes it fails
+    loudly instead of silently mis-rendering training data."""
+    from tinker_cookbook import model_info
+
+    assert model_info.get_recommended_renderer_name("thinkingmachines/Inkling") == "tml_v0"
+
+
+def test_default_loss_fn_is_a_valid_lossfntype():
+    """DEFAULT_LOSS_FN must be a valid tinker LossFnType literal (the SFT value
+    the cookbook loops use); guards against a typo or an SDK enum change."""
+    import typing
+
+    from tinker.types import LossFnType
+
+    from arm_d.train import DEFAULT_LOSS_FN
+
+    assert DEFAULT_LOSS_FN in typing.get_args(LossFnType)
