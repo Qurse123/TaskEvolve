@@ -17,6 +17,8 @@ Prices (verify against each provider's page):
 
 from __future__ import annotations
 
+import os
+
 import litellm
 
 INKLING_INPUT_COST_PER_TOKEN = 1.0e-6
@@ -81,9 +83,35 @@ TUNED_INKLING_PRICING = {
 }
 
 
+def register_tuned_inkling(model_id: str) -> None:
+    """Register an arbitrary served id (a Together-assigned tuned-adapter
+    name, not known until the console upload happens — see arm_d/serving.py)
+    at base Inkling's per-token rate, under the ``openai`` provider (the
+    Together OpenAI-compat seam Arm D reuses from Arm C). LoRA adapters don't
+    change per-token inference price; training cost is accounted separately
+    (experiment.md §15.3)."""
+    litellm.register_model(
+        {
+            model_id: {
+                "input_cost_per_token": INKLING_INPUT_COST_PER_TOKEN,
+                "output_cost_per_token": INKLING_OUTPUT_COST_PER_TOKEN,
+                "litellm_provider": "openai",
+                "mode": "chat",
+            }
+        }
+    )
+
+
 def register_pricing() -> None:
     """Register prices LiteLLM doesn't ship with. Idempotent; safe to call at
     import and repeatedly."""
     litellm.register_model(INKLING_PRICING)
     litellm.register_model(FABLE_PRICING)
     litellm.register_model(TUNED_INKLING_PRICING)
+    # The actual Arm D served id (once resolved via arm_d.serving +
+    # the Together console upload) isn't known at import time, so it's read
+    # from the environment. Unset -> no-op; the TUNED_INKLING_PRICING
+    # placeholder above still registers harmlessly.
+    tuned_model_id = os.environ.get("ARM_D_TUNED_MODEL_ID")
+    if tuned_model_id:
+        register_tuned_inkling(tuned_model_id)
