@@ -30,10 +30,10 @@ from arm_d.build_dataset import TrainingExample
 # confirmed against a live run.
 DEFAULT_COST_PER_STEP_USD = 0.0
 
-# `forward_backward`'s loss_fn identifier. UNCONFIRMED against the live Tinker
-# API — decision note §1/§6 marks the exact renderer name + round-trip as a
-# PAID/DEFERRED item. Update once a live create_lora_training_client +
-# forward_backward call confirms the correct value.
+# `forward_backward`'s loss_fn identifier. Confirmed at $0 (2026-08-05) against
+# the installed SDK: "cross_entropy" is a valid `tinker.types.LossFnType`
+# literal AND the value tinker_cookbook's own supervised loops (sl_loop.py,
+# sdft.py, train.py) pass for SFT. No live round-trip needed to pin it.
 DEFAULT_LOSS_FN = "cross_entropy"
 
 
@@ -302,7 +302,7 @@ def build_default_renderer(
     cfg: TrainConfig,
     tc: Any,
     *,
-    renderer_name: str,
+    renderer_name: str | None = None,
     max_length: int = 4096,
 ) -> Callable[[TrainingExample], Any]:
     """Real-usage renderer builder (decision note §2): resolves the cookbook
@@ -312,14 +312,19 @@ def build_default_renderer(
     ..., train_on_what=ALL_ASSISTANT_MESSAGES)` — the assistant-only loss mask
     is a library concern, not hand-built (per the note).
 
-    `renderer_name` has no hardcoded guess: the decision note marks the exact
-    renderer name for `thinkingmachines/Inkling` as a PAID/DEFERRED item (§6.1)
-    that only a live round-trip can confirm. `tc` is the raw TrainingClient
+    `renderer_name` defaults to the cookbook's recommended renderer for the base
+    model (`model_info.get_recommended_renderer_name(cfg.base_model)`). For
+    `thinkingmachines/Inkling` this resolves at $0 to `tml_v0` (confirmed
+    2026-08-05 from the installed `tinker_cookbook.model_info` table) — the
+    earlier PAID/DEFERRED unknown (decision note §6.1) is now resolved. Pass an
+    explicit `renderer_name` only to override. `tc` is the raw TrainingClient
     (e.g. `_default_client_factory(cfg).tc`), not the adapter, since only the
     raw client's `get_tokenizer()` is needed here.
     """
-    from tinker_cookbook import renderers, supervised
+    from tinker_cookbook import model_info, renderers, supervised
 
+    if renderer_name is None:
+        renderer_name = model_info.get_recommended_renderer_name(cfg.base_model)
     tok = tc.get_tokenizer()
     cb_renderer = renderers.get_renderer(renderer_name, tok, model_name=cfg.base_model)
 
