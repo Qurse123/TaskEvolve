@@ -82,3 +82,26 @@ def write_manifest(examples: list[TrainingExample], path: Path) -> None:
              "sha256": _hash(e.messages)} for e in examples]
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     Path(path).write_text(json.dumps(rows, indent=2))
+
+
+def examples_from_distill_pointer(
+    pointer_path: Path, *, seed: int = 0, k: int = 2
+) -> list[TrainingExample]:
+    """Balanced SFT examples described by a ``run_distillation`` pointer file.
+
+    The pointer (``experiments/arm_d_distill_runs.json``) has the shape
+    ``{"runs": {run_id: domain}, "logs_root": ...}``. Each run's transcript dir
+    is ``logs_root/run_id`` and ``build_examples`` keys ``domains`` by that dir's
+    basename (== ``run_id``), so passing ``dict(runs)`` maps every run to its
+    domain. Runs ``build_examples`` (passed-only, deduped) then ``balance``.
+
+    This is the single transcript->examples transform shared by
+    ``scripts.build_distill_dataset`` (the $0 build + audit step) and the
+    training step, so neither reimplements the pointer plumbing.
+    """
+    pointer = json.loads(Path(pointer_path).read_text())
+    runs: dict[str, str] = pointer["runs"]
+    logs_root = Path(pointer.get("logs_root", "experiments/logs"))
+    transcript_dirs = [logs_root / run_id for run_id in runs]
+    examples = build_examples(transcript_dirs, domains=dict(runs))
+    return balance(examples, seed=seed, k=k)
