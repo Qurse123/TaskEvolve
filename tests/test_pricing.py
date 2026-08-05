@@ -25,6 +25,7 @@ from settings.pricing import (
     INKLING_OUTPUT_COST_PER_TOKEN,
     TUNED_INKLING_MODEL_IDS,
     register_pricing,
+    register_tuned_inkling,
 )
 
 
@@ -103,3 +104,33 @@ def test_tuned_inkling_is_priced() -> None:
     for mid in TUNED_INKLING_MODEL_IDS:
         entry = litellm.model_cost.get(mid)
         assert entry and entry["input_cost_per_token"] > 0
+
+
+def test_register_tuned_inkling_prices_arbitrary_served_id() -> None:
+    # The real served id (a Together-assigned adapter name, e.g. an
+    # "acct/name-lora" slug) isn't known until the console upload happens.
+    # register_tuned_inkling must price whatever id is actually served, at
+    # base Inkling's per-token rate, under the openai provider (same reasoning
+    # as INKLING_PRICING above: must match the call's custom_llm_provider).
+    register_tuned_inkling("acct/foo-lora")
+    entry = litellm.model_cost["acct/foo-lora"]
+    assert entry["input_cost_per_token"] == INKLING_INPUT_COST_PER_TOKEN
+    assert entry["output_cost_per_token"] == INKLING_OUTPUT_COST_PER_TOKEN
+    assert entry["litellm_provider"] == "openai"
+    assert entry["mode"] == "chat"
+
+
+def test_register_pricing_registers_served_id_from_env(monkeypatch) -> None:
+    monkeypatch.setenv("ARM_D_TUNED_MODEL_ID", "acct/env-served-lora")
+    litellm.model_cost.pop("acct/env-served-lora", None)
+    register_pricing()
+    entry = litellm.model_cost["acct/env-served-lora"]
+    assert entry["input_cost_per_token"] == INKLING_INPUT_COST_PER_TOKEN
+    assert entry["litellm_provider"] == "openai"
+
+
+def test_register_pricing_skips_served_id_when_env_unset(monkeypatch) -> None:
+    monkeypatch.delenv("ARM_D_TUNED_MODEL_ID", raising=False)
+    litellm.model_cost.pop("some-id-that-should-not-appear", None)
+    register_pricing()  # must not raise with the env var absent
+    assert "some-id-that-should-not-appear" not in litellm.model_cost
