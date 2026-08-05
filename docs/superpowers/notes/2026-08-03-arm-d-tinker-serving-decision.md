@@ -71,29 +71,58 @@ The SDK exposes billing/telemetry types: `tinker.types.BillingUsageResponse`,
 cost from the billing/usage API after the run (or, fallback, record step count ×
 a documented per-step rate). Keep it separate from runtime token cost.
 
-## 4. Serving the tuned model — PAID / USER DECISION (top risk)
+## 4. Serving the tuned model — path A CHOSEN + resolved (2026-08-04)
 
 **Finding:** the SDK's inference is `SamplingClient.sample(prompt: ModelInput, num_samples,
 sampling_params) -> SampleResponse` — **raw-token completion over `ModelInput`. There is NO
 built-in OpenAI-compatible chat/tools endpoint.** TAU2's agent calls the model through
 `litellm.completion` with OpenAI chat + tool schemas, so the tuned model cannot be dropped
-into the existing eval seam as-is. Two viable paths (pick one; both need the user):
+into the existing eval seam as-is. Two paths were identified; **A is chosen** (user-confirmed
+against the Together console: Inkling IS a supported Together base,
+`thinkingmachines/inkling`, for both serverless and dedicated inference, OpenAI-compat with
+native function calling):
 
-- **A — Export/deploy on Together (preferred if supported).** The SDK has weight
-  export/download surface (`Checkpoint`, `save_state`, `CheckpointArchiveUrlResponse`,
-  `WeightsDownloadError`/`WeightsMergeError`/`WeightsAdapterError`). If Together can host the
-  exported Inkling LoRA behind its OpenAI-compat endpoint, Arm D reuses the Arm C seam
-  unchanged (`AGENT_MODEL=openai/<tuned-id>` + `AGENT_API_BASE=together`). **User must confirm
-  in their Together console whether tuned-Inkling LoRA deploys are available.**
-- **B — Local OpenAI-compat shim over `SamplingClient` (fallback, no Together dependency).**
-  A tiny FastAPI server exposing `/v1/chat/completions` that: renders incoming chat+tools via
-  the SAME `renderer` used in training → `ModelInput`, calls `SamplingClient.sample`, parses
-  tool calls back out of the completion (`renderers.parse_content_blocks` /
-  `classify_parse_failure`). Point the eval seam at it via `AGENT_API_BASE=http://localhost:PORT/v1`.
-  More code + format-bug risk; smoke-gated like Arm C.
+- **A — Export/deploy on Together. CHOSEN.** Verified end-to-end chain, built in
+  `arm_d/serving.py`:
+  1. **Train** (already built): `arm_d/train.py` saves a Tinker checkpoint ->
+     `tinker://<run-id>/sampler_weights/<step>`.
+  2. **Export** (`export_adapter_to_hf`): `tinker checkpoint push-hf <checkpoint> --repo <hf-repo>`
+     publishes a **standard PEFT LoRA adapter** (`adapter_config.json` +
+     `adapter_model.safetensors` + `checkpoint_complete`; `base_model_name_or_path`
+     auto-patched) to the HF Hub. Needs `huggingface_hub` + `hf auth login` at real run
+     time — a user/paid step, not exercised by the ($0) unit tests.
+  3. **Deploy (USER step, console only — not automated in code):** in the Together console,
+     Models -> Upload a model -> type=Adapter, base=`thinkingmachines/inkling`, Source
+     URL=the HF repo (+ HF token if private). Together returns a served `model_name`.
+     **The serverless-vs-dedicated determination happens here, at this paid console step**
+     — it is an account/capacity decision Together makes on upload, not something the code
+     chooses or can predict ahead of time.
+  4. **Serve** (`resolve_tuned_agent_model`): point the existing eval seam at the returned
+     `model_name` exactly like Arm C — `AGENT_MODEL=openai/<model_name>`,
+     `AGENT_API_BASE=https://api.together.xyz/v1`, `TOGETHER_API_KEY`. The `together_ai/`
+     provider drops tool schemas, so use the `openai/` + api_base path (unchanged from
+     Arm C's finding).
 
-Whichever is chosen, register the resulting model id in `settings/pricing.py`
-(`TUNED_INKLING_MODEL_IDS`) at Inkling's per-token price so runtime cost records nonzero.
+  **Correction to the original framing below:** "reuses Arm C's exact seam" is only fully
+  true for the **serverless multi-LoRA** case (per-token billing, same request shape as
+  Arm C). If Together instead provisions Arm D onto a **dedicated endpoint** (documented
+  fallback when serverless multi-LoRA isn't available for this adapter/base pair), the
+  *request* seam (`openai/` + api_base) is still identical, but billing switches from
+  per-token to **GPU-hour**, and `settings/pricing.py::register_tuned_inkling` (per-token
+  rate) would then be the wrong accounting model for that run — a follow-up, not built here
+  (YAGNI: no dedicated-endpoint automation; that path's cost accounting is deferred until a
+  dedicated endpoint is actually provisioned).
+
+- **B — Local OpenAI-compat shim over `SamplingClient`.** Superseded by A; kept below for
+  reference only (unused, no code built): a tiny FastAPI server exposing
+  `/v1/chat/completions` that renders incoming chat+tools via the SAME `renderer` used in
+  training -> `ModelInput`, calls `SamplingClient.sample`, parses tool calls back out of the
+  completion (`renderers.parse_content_blocks` / `classify_parse_failure`). Point the eval
+  seam at it via `AGENT_API_BASE=http://localhost:PORT/v1`. More code + format-bug risk.
+
+The served model id is registered in `settings/pricing.py` via `register_tuned_inkling` /
+`ARM_D_TUNED_MODEL_ID` (env-driven — the id isn't known until the console upload above) at
+Inkling's per-token price, so runtime cost records nonzero for the serverless case.
 
 ## 5. Config bridge (do in code)
 
