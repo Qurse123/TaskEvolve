@@ -24,6 +24,12 @@ from settings.pricing import register_pricing
 # import AGENT_MODEL` self-sufficient.
 load_dotenv()
 
+# Bridge: the Tinker SDK reads TINKER_API_KEY, but our .env names it TINKER_KEY.
+# Only fill in TINKER_API_KEY if it isn't already set, so an explicit
+# TINKER_API_KEY in the real environment still wins.
+if os.environ.get("TINKER_KEY") and not os.environ.get("TINKER_API_KEY"):
+    os.environ.setdefault("TINKER_API_KEY", os.environ["TINKER_KEY"])
+
 # Register per-token prices for open-weight models LiteLLM doesn't know (Inkling,
 # Arms C/D). Done at config import — which every run path imports before any
 # generate() call — so litellm.completion_cost prices those models instead of

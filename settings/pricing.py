@@ -61,8 +61,29 @@ FABLE_PRICING = {
 }
 
 
+# Tuned Inkling (Arm D) — a LoRA fine-tune of base Inkling, served behind
+# AGENT_MODEL/AGENT_API_BASE once the serving path is finalized. Runtime token
+# price is unchanged from base Inkling (LoRA adapters don't change per-token
+# inference cost); training cost is accounted separately (experiment.md §15.3).
+# The served model id isn't finalized yet, so this is a config-driven
+# placeholder, not a real endpoint — override via the (future) served id before
+# any real Arm D spend.
+TUNED_INKLING_MODEL_IDS = ("armd-inkling-lora",)
+
+TUNED_INKLING_PRICING = {
+    model_id: {
+        "input_cost_per_token": INKLING_INPUT_COST_PER_TOKEN,
+        "output_cost_per_token": INKLING_OUTPUT_COST_PER_TOKEN,
+        "litellm_provider": "openai",
+        "mode": "chat",
+    }
+    for model_id in TUNED_INKLING_MODEL_IDS
+}
+
+
 def register_pricing() -> None:
     """Register prices LiteLLM doesn't ship with. Idempotent; safe to call at
     import and repeatedly."""
     litellm.register_model(INKLING_PRICING)
     litellm.register_model(FABLE_PRICING)
+    litellm.register_model(TUNED_INKLING_PRICING)

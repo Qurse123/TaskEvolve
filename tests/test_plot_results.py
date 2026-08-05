@@ -14,6 +14,7 @@ import pytest
 
 from scripts.plot_results import (
     RunPoint,
+    _arm_label,
     _mean_std,
     _padded_range,
     _row_to_point,
@@ -81,6 +82,21 @@ def test_row_to_point_returns_none_when_num_tasks_zero():
 
 def test_row_to_point_returns_none_when_cost_missing():
     assert _row_to_point(_row(cost="")) is None
+
+
+def test_arm_label_distinguishes_tuned_from_base_inkling():
+    # Arm D serves a LoRA-tuned Inkling; its arm label must not collapse into
+    # base Inkling's (Arm C) label, or the frontier plot merges two arms into
+    # one cloud. _arm_label takes a results.csv row dict, not keyword args.
+    base = _arm_label({
+        "split": "eval_airline", "harness_version": "v0.1",
+        "agent_model": "thinkingmachines/Inkling",
+    })
+    tuned = _arm_label({
+        "split": "eval_airline", "harness_version": "v0.1",
+        "agent_model": "armd-inkling-lora",
+    })
+    assert base != tuned
 
 
 # --- _mean_std ---------------------------------------------------------------
