@@ -11,12 +11,9 @@ from __future__ import annotations
 def get_model(configured_model: str, history=None) -> str:
     """Return the model to use for the current generation call.
 
-    Routing policy: the retail tasks are dominated by mechanical tool
-    sequences (get_order_details, exchange/return flows) with explicit user
-    confirmations, so the reasoning demands are low. We return a single mid
-    model (sonnet-5) for the WHOLE agent. This cuts per-token price ~2.5x on
-    both input and output versus opus, which multiplies directly into
-    cost-per-successful-task since cost is dominated by token volume across
-    many turns.
+    v0.1 (static harness for Arms A/C/D): identity routing — always use the
+    configured AGENT_MODEL. Do not override the model here; the model axis is
+    controlled entirely by AGENT_MODEL so open-weight arms actually run their
+    own model.
     """
-    return "anthropic/claude-sonnet-5"
+    return configured_model

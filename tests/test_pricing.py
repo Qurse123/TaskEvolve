@@ -23,6 +23,7 @@ from settings.pricing import (
     INKLING_INPUT_COST_PER_TOKEN,
     INKLING_MODEL_IDS,
     INKLING_OUTPUT_COST_PER_TOKEN,
+    TUNED_INKLING_MODEL_IDS,
     register_pricing,
 )
 
@@ -92,3 +93,13 @@ def test_config_import_registers_pricing() -> None:
         completion_tokens=1000,
     )
     assert completion_cost == pytest.approx(1000 * INKLING_OUTPUT_COST_PER_TOKEN)
+
+
+def test_tuned_inkling_is_priced() -> None:
+    # Arm D serves a LoRA-tuned Inkling at an id that isn't finalized (config-
+    # driven placeholder, not a real endpoint). It must price nonzero at the
+    # same per-token rate as base Inkling once registered.
+    register_pricing()
+    for mid in TUNED_INKLING_MODEL_IDS:
+        entry = litellm.model_cost.get(mid)
+        assert entry and entry["input_cost_per_token"] > 0

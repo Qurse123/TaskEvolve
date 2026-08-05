@@ -66,25 +66,20 @@ def generate_splits() -> None:
 
 
 def load_split(name: str) -> list[str]:
-    """Return the list of task IDs for a named split.
+    """Return the task IDs for a named split file in SPLITS_DIR.
 
-    Args:
-        name: One of "smoke", "proxy", "validation".
-
-    Returns:
-        List of task ID strings.
+    Any ``<name>.json`` present is loadable (frozen proxy/validation/smoke plus
+    the Arm D multi-domain splits). Unknown names raise FileNotFoundError.
     """
-    allowed = {"smoke", "proxy", "validation"}
-    if name not in allowed:
-        raise ValueError(f"Split must be one of {allowed}, got {name!r}")
-
+    if not name or "/" in name or ".." in name:
+        raise ValueError(f"Invalid split name: {name!r}")
     path = SPLITS_DIR / f"{name}.json"
     if not path.exists():
         raise FileNotFoundError(
             f"Split file not found: {path}\n"
-            "Run `python -m benchmark.splits` to generate splits."
+            "Run `python -m benchmark.splits` (frozen splits) or "
+            "`python -m benchmark.splits_arm_d` (Arm D splits) to generate it."
         )
-
     return json.loads(path.read_text())
 
 

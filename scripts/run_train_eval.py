@@ -35,7 +35,7 @@ from settings import config
 
 logger = logging.getLogger(__name__)
 
-TRAIN_SPLITS = ("proxy", "validation")
+TRAIN_SPLITS = ("proxy", "validation")  # advisory only; --split accepts any split file name
 
 
 @dataclass(frozen=True)
@@ -249,7 +249,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description="Run a proxy/validation baseline as a mean ± std distribution."
     )
-    parser.add_argument("--split", required=True, choices=TRAIN_SPLITS)
+    parser.add_argument(
+        "--split", required=True,
+        help="Split file name in benchmark/splits/ (proxy, validation, eval_airline, ...).",
+    )
     parser.add_argument(
         "--seed-start",
         type=int,
