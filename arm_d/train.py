@@ -84,25 +84,39 @@ def _block(value: Any) -> Any:
     return result_fn() if callable(result_fn) else value
 
 
+def _loss_from_metrics(metrics: Any) -> float | None:
+    """Pull a loss value from a `ForwardBackwardOutput.metrics` dict. Prefers an
+    exact ``"loss"`` key, else the first key containing ``"loss"`` — the real
+    Tinker metrics key is provider-versioned and may be suffixed (e.g.
+    ``"loss:sum"``), which is why the smoke saw loss=0.0 with a strict lookup."""
+    if not isinstance(metrics, dict) or not metrics:
+        return None
+    if "loss" in metrics:
+        return float(metrics["loss"])
+    for key, val in metrics.items():
+        if "loss" in str(key).lower():
+            try:
+                return float(val)
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
 def _extract_loss(result: Any) -> float:
-    """Best-effort loss extraction from a forward_backward result. The fake test
-    client returns `{"loss": v}`; the real API's exact result shape isn't pinned
-    (decision note doesn't specify it), so this also tries a `.loss` /
-    `.metrics["loss"]` attribute for forward compatibility, falling back to 0.0."""
+    """Best-effort loss from a forward_backward result. The fake test client
+    returns `{"loss": v}`; the real `ForwardBackwardOutput` carries a `metrics`
+    dict (loss under a possibly-suffixed key — see `_loss_from_metrics`), so the
+    early-stop signal is read from there, not a strict `metrics["loss"]`."""
     if isinstance(result, dict):
         if "loss" in result:
             return float(result["loss"])
-        metrics = result.get("metrics")
-        if isinstance(metrics, dict) and "loss" in metrics:
-            return float(metrics["loss"])
-        return 0.0
+        from_metrics = _loss_from_metrics(result.get("metrics"))
+        return from_metrics if from_metrics is not None else 0.0
     loss = getattr(result, "loss", None)
     if loss is not None:
         return float(loss)
-    metrics = getattr(result, "metrics", None)
-    if isinstance(metrics, dict) and "loss" in metrics:
-        return float(metrics["loss"])
-    return 0.0
+    from_metrics = _loss_from_metrics(getattr(result, "metrics", None))
+    return from_metrics if from_metrics is not None else 0.0
 
 
 def _extract_cost(telemetry: Any) -> float | None:
@@ -201,7 +215,12 @@ def train(
                 break
 
     checkpoint_name = f"arm-d-{Path(cfg.base_model).name.lower()}-lora-{log_dir.name}"
-    sampling_client = client.save_weights_and_get_sampling_client(name=checkpoint_name)
+    # Persist an EXPORTABLE checkpoint (a tinker:// path) then get a sampler from
+    # it. save_weights_and_get_sampling_client makes an *ephemeral* checkpoint
+    # whose weights can't be exported to HF — arm_d.serving.export_adapter_to_hf
+    # needs this persistent path (`tinker checkpoint push-hf <path>`).
+    checkpoint_path = client.save_weights_for_sampler(checkpoint_name)
+    sampling_client = client.create_sampling_client(checkpoint_path)
 
     training_cost_usd, cost_note = _training_cost(client, steps, cfg)
 
@@ -211,7 +230,8 @@ def train(
         "best_holdout_loss": best_holdout_loss,
         "training_cost_usd": training_cost_usd,
         "cost_note": cost_note,
-        "checkpoint": checkpoint_name,
+        "checkpoint": checkpoint_path,
+        "checkpoint_name": checkpoint_name,
         "num_train_examples": len(train_examples),
         "num_holdout_examples": len(holdout_examples),
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -224,7 +244,7 @@ def train(
             shutil.copy2(manifest_path, log_dir / manifest_path.name)
 
     return TrainResult(
-        checkpoint=checkpoint_name,
+        checkpoint=checkpoint_path,
         sampling_client=sampling_client,
         training_cost_usd=training_cost_usd,
         steps=steps,
@@ -259,8 +279,15 @@ class _RealTrainingClientAdapter:
 
         return self.tc.optim_step(tinker.AdamParams(learning_rate=self._lr))
 
-    def save_weights_and_get_sampling_client(self, name: str | None = None) -> Any:
-        return self.tc.save_weights_and_get_sampling_client(name=name)
+    def save_weights_for_sampler(self, name: str) -> str:
+        # Persistent, EXPORTABLE checkpoint. save_weights_and_get_sampling_client
+        # makes an ephemeral one (weights can't be exported to HF); this returns
+        # the tinker:// path arm_d.serving.export_adapter_to_hf pushes.
+        resp = self.tc.save_weights_for_sampler(name=name).result()
+        return resp.path
+
+    def create_sampling_client(self, model_path: str) -> Any:
+        return self.tc.create_sampling_client(model_path=model_path)
 
     def get_tokenizer(self) -> Any:
         return self.tc.get_tokenizer()
@@ -322,10 +349,17 @@ def build_default_renderer(
     raw client's `get_tokenizer()` is needed here.
     """
     from tinker_cookbook import model_info, renderers, supervised
+    from tinker_cookbook.tokenizer_utils import get_tokenizer
 
     if renderer_name is None:
         renderer_name = model_info.get_recommended_renderer_name(cfg.base_model)
-    tok = tc.get_tokenizer()
+    # Load the tokenizer via the cookbook loader (tml_renderers-backed for
+    # Inkling), NOT tc.get_tokenizer(): tinker's path imports `tml_tokenizers`
+    # (not published on PyPI) for thinkingmachines/ models and raises
+    # ModuleNotFoundError. The cookbook adapter resolves Inkling's tokenizer
+    # through tml_renderers instead (confirmed live 2026-08-06). `tc` is no
+    # longer needed here but stays in the signature for call-site stability.
+    tok = get_tokenizer(cfg.base_model)
     cb_renderer = renderers.get_renderer(renderer_name, tok, model_name=cfg.base_model)
 
     def _renderer(example: TrainingExample) -> Any:
