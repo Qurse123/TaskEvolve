@@ -20,7 +20,8 @@ class _FakeClient:
     def __init__(self): self.steps = 0
     def forward_backward(self, batch): self.steps += 1; return {"loss": 1.0 / (self.steps + 1)}
     def optim_step(self): pass
-    def save_weights_and_get_sampling_client(self, name=None): return object()
+    def save_weights_for_sampler(self, name): return f"tinker://fake/{name}/sampler_weights/final"
+    def create_sampling_client(self, model_path): return object()
 
 
 def test_train_logs_cost_and_stops_early(tmp_path):

@@ -18,7 +18,10 @@ class _FakeClient:
     def optim_step(self):
         pass
 
-    def save_weights_and_get_sampling_client(self, name=None):
+    def save_weights_for_sampler(self, name):
+        return f"tinker://fake/{name}/sampler_weights/final"
+
+    def create_sampling_client(self, model_path):
         return object()
 
 
