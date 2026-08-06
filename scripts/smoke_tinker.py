@@ -77,12 +77,16 @@ def main() -> int:
     print("[4] forward_backward + optim_step (loss_fn=cross_entropy) ...")
     fb = tc.forward_backward(data=[datum], loss_fn="cross_entropy").result()
     print(f"    ok: forward_backward returned; loss={_extract_loss(fb)}")
+    print(f"    raw metrics keys: {list(getattr(fb, 'metrics', {}) or {})}")
     tc.optim_step(tinker.AdamParams(learning_rate=cfg.lr)).result()
     print("    ok: optim_step applied.")
 
-    # [5] Save adapter + obtain a sampling client (the serving handoff point).
-    print("[5] save_weights_and_get_sampling_client(name='armd-smoke') ...")
-    sampler = tc.save_weights_and_get_sampling_client(name="armd-smoke")
+    # [5] Persist an EXPORTABLE checkpoint (tinker:// path) + get a sampler from
+    # it. save_weights_and_get_sampling_client is ephemeral (can't be exported).
+    print("[5] save_weights_for_sampler(name='armd-smoke') + create_sampling_client ...")
+    ckpt_path = tc.save_weights_for_sampler(name="armd-smoke").result().path
+    sampler = tc.create_sampling_client(model_path=ckpt_path)
+    print(f"    ok: persistent checkpoint = {ckpt_path}")
     print(f"    ok: sampling client obtained ({type(sampler).__name__}).")
 
     # [6] Best-effort training-cost telemetry (§15.3) — informational only.
