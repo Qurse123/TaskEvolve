@@ -19,6 +19,7 @@ def test_holdout_split_is_by_task():
 class _FakeClient:
     def __init__(self): self.steps = 0
     def forward_backward(self, batch): self.steps += 1; return {"loss": 1.0 / (self.steps + 1)}
+    def forward(self, batch): return {"loss": 0.5}  # holdout eval (forward-only), constant
     def optim_step(self): pass
     def save_weights_for_sampler(self, name): return f"tinker://fake/{name}/sampler_weights/final"
     def create_sampling_client(self, model_path): return object()
@@ -34,6 +35,18 @@ def test_train_logs_cost_and_stops_early(tmp_path):
     assert res.steps >= 1
     assert (tmp_path / "training_record.json").exists()
     assert res.training_cost_usd >= 0.0
+
+
+def test_minibatch_takes_multiple_steps_per_epoch(tmp_path):
+    # 20 tasks, ~15% holdout -> ~17 train; batch_size 4 -> ~5 gradient steps in a
+    # single epoch (the point of minibatch SGD: many updates, not one per epoch).
+    exs = [_ex(f"t{i}") for i in range(20)]
+    cfg = TrainConfig(max_epochs=1, patience=5, batch_size=4)
+    res = train(exs, cfg,
+                client_factory=lambda cfg: _FakeClient(),
+                renderer=lambda ex: {"tokens": [1, 2], "weights": [0, 1]},
+                log_dir=tmp_path)
+    assert res.steps >= 4  # multiple minibatch steps within one epoch
 
 
 def test_inkling_renderer_name_pinned_to_tml_v0():

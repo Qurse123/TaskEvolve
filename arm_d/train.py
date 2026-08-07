@@ -42,8 +42,12 @@ class TrainConfig:
     base_model: str = "thinkingmachines/Inkling"
     lora_rank: int = 32
     lr: float = 1e-4
-    max_epochs: int = 3
-    patience: int = 1
+    max_epochs: int = 4
+    patience: int = 2
+    # Minibatch size for SGD: each epoch takes ceil(n_train/batch_size) gradient
+    # steps (forward_backward + optim_step per minibatch), not one full-batch
+    # step — so a run does many updates, a real fine-tune rather than a few.
+    batch_size: int = 8
     # See DEFAULT_COST_PER_STEP_USD above.
     cost_per_step_usd: float = DEFAULT_COST_PER_STEP_USD
 
@@ -190,20 +194,33 @@ def train(
     epochs_without_improvement = 0
     last_train_loss = 0.0
 
-    for _epoch in range(cfg.max_epochs):
-        train_batch = [renderer(ex) for ex in train_examples]
-        fb_result = _block(client.forward_backward(train_batch))
-        last_train_loss = _extract_loss(fb_result)
-        _block(client.optim_step())
-        steps += 1
+    # Render once (deterministic), then run minibatch SGD: each epoch takes
+    # ceil(n_train/batch_size) gradient steps (forward_backward + optim_step per
+    # minibatch), so a run does many updates — a real fine-tune, not a few.
+    train_datums = [renderer(ex) for ex in train_examples]
+    holdout_datums = [renderer(ex) for ex in holdout_examples]
+    shuffle_rng = random.Random(holdout_seed)
 
-        if holdout_examples:
-            holdout_batch = [renderer(ex) for ex in holdout_examples]
-            ho_result = _block(client.forward_backward(holdout_batch))
+    for _epoch in range(cfg.max_epochs):
+        order = list(range(len(train_datums)))
+        shuffle_rng.shuffle(order)
+        for start in range(0, len(order), cfg.batch_size):
+            batch = [train_datums[i] for i in order[start:start + cfg.batch_size]]
+            if not batch:
+                continue
+            fb_result = _block(client.forward_backward(batch))
+            last_train_loss = _extract_loss(fb_result)
+            _block(client.optim_step())
+            steps += 1
+
+        if holdout_datums:
+            # forward-only: the holdout pass must NOT accumulate gradients that
+            # would leak into the next epoch's first optim_step.
+            ho_result = _block(client.forward(holdout_datums))
             holdout_loss = _extract_loss(ho_result)
         else:
             # Degenerate case (too few distinct tasks for a holdout slice):
-            # fall back to train loss so early-stop still has a signal.
+            # fall back to last train loss so early-stop still has a signal.
             holdout_loss = last_train_loss
 
         if holdout_loss < best_holdout_loss - 1e-9:
@@ -274,6 +291,11 @@ class _RealTrainingClientAdapter:
     def forward_backward(self, batch: list[Any]) -> Any:
         return self.tc.forward_backward(data=batch, loss_fn=self._loss_fn)
 
+    def forward(self, batch: list[Any]) -> Any:
+        # forward-only (no gradient accumulation) — for holdout eval, so the
+        # holdout pass never leaks gradients into the next training step.
+        return self.tc.forward(data=batch, loss_fn=self._loss_fn)
+
     def optim_step(self) -> Any:
         import tinker
 
@@ -316,13 +338,31 @@ def _to_cookbook_messages(messages: list[dict]) -> list[dict]:
     for m in messages:
         msg: dict = {"role": m.get("role"), "content": m.get("content")}
         if m.get("tool_calls"):
-            msg["tool_calls"] = m["tool_calls"]
+            msg["tool_calls"] = [_to_openai_tool_call(tc) for tc in m["tool_calls"]]
         if m.get("tool_call_id"):
             msg["tool_call_id"] = m["tool_call_id"]
         if m.get("name"):
             msg["name"] = m["name"]
         out.append(msg)
     return out
+
+
+def _to_openai_tool_call(tc: dict) -> dict:
+    """TAU2 stores tool calls flat: ``{id, name, arguments(dict)}``. The tml_v0
+    renderer uses the OpenAI schema: ``{id, type:"function", function:{name,
+    arguments(JSON string)}}`` — a call missing ``function`` raises
+    ``ValueError: tool_call missing 'function'``. Pass through anything already
+    OpenAI-shaped; JSON-encode dict arguments (OpenAI wants a string)."""
+    if not isinstance(tc, dict) or "function" in tc:
+        return tc
+    args = tc.get("arguments")
+    if not isinstance(args, str):
+        args = json.dumps(args if args is not None else {})
+    return {
+        "id": tc.get("id"),
+        "type": "function",
+        "function": {"name": tc.get("name"), "arguments": args},
+    }
 
 
 def build_default_renderer(

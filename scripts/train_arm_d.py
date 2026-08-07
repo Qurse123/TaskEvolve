@@ -23,6 +23,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional, Sequence, Tuple
 
+import settings.config  # noqa: F401  side effect: load .env + bridge TINKER_KEY -> TINKER_API_KEY
+
 from arm_d.build_dataset import examples_from_distill_pointer
 from arm_d.train import TrainConfig, TrainResult, train
 
@@ -106,6 +108,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--log-dir", type=Path, default=None,
                         help="Training output dir (default: experiments/arm_d_training/run_<UTC>).")
+    parser.add_argument("--base-model", default=TrainConfig.base_model,
+                        help="Tinker base to fine-tune (e.g. thinkingmachines/Inkling-Small).")
     parser.add_argument("--lora-rank", type=int, default=TrainConfig.lora_rank)
     parser.add_argument("--lr", type=float, default=TrainConfig.lr)
     parser.add_argument("--max-epochs", type=int, default=TrainConfig.max_epochs)
@@ -115,7 +119,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    cfg = TrainConfig(lora_rank=args.lora_rank, lr=args.lr,
+    cfg = TrainConfig(base_model=args.base_model, lora_rank=args.lora_rank, lr=args.lr,
                       max_epochs=args.max_epochs, patience=args.patience)
     train_arm_d(pointer_path=args.pointer, manifest_path=args.manifest,
                 log_dir=args.log_dir, cfg=cfg, seed=args.seed, k=args.k)

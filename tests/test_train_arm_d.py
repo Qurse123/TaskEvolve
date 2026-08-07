@@ -15,6 +15,9 @@ class _FakeClient:
         self.steps += 1
         return {"loss": 1.0 / (self.steps + 1)}
 
+    def forward(self, batch):  # holdout eval (forward-only)
+        return {"loss": 0.5}
+
     def optim_step(self):
         pass
 

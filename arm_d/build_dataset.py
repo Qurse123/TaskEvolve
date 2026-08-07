@@ -31,8 +31,13 @@ def _reward(rec: dict) -> float:
 
 
 def _normalize(m: dict) -> dict:
-    return {"role": m.get("role"), "content": m.get("content"),
-            "tool_calls": m.get("tool_calls")}
+    out = {"role": m.get("role"), "content": m.get("content"),
+           "tool_calls": m.get("tool_calls")}
+    # TAU2 tool-result messages store the responded tool_call id in `id`;
+    # preserve it as tool_call_id so the renderer can link result -> call.
+    if m.get("role") == "tool":
+        out["tool_call_id"] = m.get("tool_call_id") or m.get("id")
+    return out
 
 
 def _hash(messages: list[dict]) -> str:
