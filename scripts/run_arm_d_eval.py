@@ -2,10 +2,18 @@
 the pre-registered eval splits — see experiments/arm_d_eval_precommit.md).
 
 Runs BOTH systems the pre-registration fixes, over the 4 held-out/transfer
-splits x seeds 2001-2005, in the static v0.1 harness through the SAME Together
-`openai/` seam (so the only variable is the LoRA adapter — §8 guards 1 & 2):
-  - base_control : base Inkling (openai/thinkingmachines/Inkling)  [no adapter]
-  - tuned        : the Arm D adapter (openai/$ARM_D_TUNED_MODEL_ID)
+splits x seeds 2001-2003, in the static v0.1 harness through the SAME local
+Tinker serving shim (arm_d/serving_shim.py) — an `openai/` + AGENT_API_BASE
+seam pointed at localhost instead of Together, so the only variable is the
+LoRA adapter (§8 guards 1 & 2):
+  - base_control : naive Inkling-Small (openai/thinkingmachines/Inkling-Small)
+  - tuned        : the Arm D adapter (openai/armd-inkling-small-tuned)
+
+Both ids are routed by arm_d/serving_shim.py to Tinker SamplingClients (tuned
+via model_path, base via base_model) — CHEAP per-token serving, since neither
+Together nor Fireworks will serve a custom LoRA adapter without a dedicated
+GPU endpoint. The shim must be running (`python -m arm_d.serving_shim`)
+before this driver is invoked.
 
 Each (system, split) runs in its OWN subprocess so `settings.config` reads that
 system's AGENT_MODEL (config resolves env at import; an in-process second run
@@ -13,10 +21,10 @@ would reuse the first system's model). Per-repeat metrics are captured via
 `run_train_eval --metrics-json`, and an index (experiments/arm_d_eval_index.json)
 maps (system, split) -> metrics file + run spec for the plotting step.
 
-Launch DETACHED (8 system x split runs, 5 seeds each):
+Launch DETACHED (8 system x split runs, 3 seeds each):
     nohup python -m scripts.run_arm_d_eval > arm_d_eval.log 2>&1 &
 
-TOGETHER_API_KEY must be in .env (config maps it to AGENT_API_KEY).
+TINKER_KEY must be in .env (config bridges it to TINKER_API_KEY for the shim).
 """
 from __future__ import annotations
 
@@ -40,9 +48,13 @@ EVAL_SPLITS: Tuple[Tuple[str, str], ...] = (
     ("transfer_banking", "banking_knowledge"),
 )
 SEED_START = 2001
-REPEATS = 5
-TOGETHER_API_BASE = "https://api.together.xyz/v1"
-BASE_INKLING_ID = "thinkingmachines/Inkling"  # matched base control (no adapter)
+REPEATS = 3
+# Local Tinker serving shim (arm_d/serving_shim.py) — path B: per-token, no
+# dedicated GPU endpoint. Replaces the Arm C Together seam for Arm D since
+# neither Together nor Fireworks will serve a custom LoRA adapter serverless.
+SHIM_API_BASE = "http://localhost:8100/v1"
+BASE_INKLING_ID = "thinkingmachines/Inkling-Small"  # matched base control (no adapter)
+DEFAULT_TUNED_MODEL_ID = "armd-inkling-small-tuned"
 DEFAULT_INDEX = Path("experiments/arm_d_eval_index.json")
 DEFAULT_METRICS_ROOT = Path("experiments/arm_d_eval_metrics")
 
@@ -60,7 +72,7 @@ def run_arm_d_eval(
     splits: Sequence[Tuple[str, str]] = EVAL_SPLITS,
     seed_start: int = SEED_START,
     repeats: int = REPEATS,
-    api_base: str = TOGETHER_API_BASE,
+    api_base: str = SHIM_API_BASE,
     index_path: Path = DEFAULT_INDEX,
     metrics_root: Path = DEFAULT_METRICS_ROOT,
     runner: Runner = _default_runner,
@@ -68,14 +80,15 @@ def run_arm_d_eval(
 ) -> List[dict]:
     """Run every (system, split) eval and write the plotting index.
 
-    Both systems go through the identical Together `openai/` seam in the v0.1
-    harness; only the model id differs (base vs adapter). `runner` and `base_env`
-    are injected so the whole driver is unit-testable at $0 (no real eval spend).
+    Both systems go through the identical local Tinker shim `openai/` seam in
+    the v0.1 harness; only the model id differs (base vs adapter). `runner` and
+    `base_env` are injected so the whole driver is unit-testable at $0 (no real
+    eval spend).
     """
     if not tuned_model_id:
         raise SystemExit(
-            "tuned_model_id is required — set ARM_D_TUNED_MODEL_ID (the Together "
-            "adapter id) or pass --model-id. Run scripts.train_arm_d + export first."
+            "tuned_model_id is required — set ARM_D_TUNED_MODEL_ID (the shim-routed "
+            "tuned-adapter id) or pass --model-id. Run scripts.train_arm_d first."
         )
 
     systems = (("base_control", base_model_id), ("tuned", tuned_model_id))
@@ -118,8 +131,12 @@ def run_arm_d_eval(
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--model-id", default=os.environ.get("ARM_D_TUNED_MODEL_ID"),
-                        help="Together tuned-adapter id (default: $ARM_D_TUNED_MODEL_ID).")
+    parser.add_argument(
+        "--model-id",
+        default=os.environ.get("ARM_D_TUNED_MODEL_ID", DEFAULT_TUNED_MODEL_ID),
+        help="Shim-routed tuned-adapter id (default: $ARM_D_TUNED_MODEL_ID or "
+        f"{DEFAULT_TUNED_MODEL_ID!r}).",
+    )
     parser.add_argument("--base-model-id", default=BASE_INKLING_ID,
                         help=f"Matched base control id (default {BASE_INKLING_ID}).")
     parser.add_argument("--seed-start", type=int, default=SEED_START)
