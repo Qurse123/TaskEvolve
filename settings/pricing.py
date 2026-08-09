@@ -82,6 +82,25 @@ TUNED_INKLING_PRICING = {
     for model_id in TUNED_INKLING_MODEL_IDS
 }
 
+INKLING_SMALL_INPUT_COST_PER_TOKEN = 0.5e-6
+INKLING_SMALL_OUTPUT_COST_PER_TOKEN = 1.2e-6
+
+
+def register_inkling_small(model_id: str) -> None:
+    """Register an Inkling-Small-served id (base or LoRA-tuned — the shim
+    routes both through the same ``openai/`` provider seam, see
+    arm_d/serving_shim.py) at Inkling-Small's per-token rate."""
+    litellm.register_model(
+        {
+            model_id: {
+                "input_cost_per_token": INKLING_SMALL_INPUT_COST_PER_TOKEN,
+                "output_cost_per_token": INKLING_SMALL_OUTPUT_COST_PER_TOKEN,
+                "litellm_provider": "openai",
+                "mode": "chat",
+            }
+        }
+    )
+
 
 def register_tuned_inkling(model_id: str) -> None:
     """Register an arbitrary served id (a Together-assigned tuned-adapter
@@ -115,3 +134,9 @@ def register_pricing() -> None:
     tuned_model_id = os.environ.get("ARM_D_TUNED_MODEL_ID")
     if tuned_model_id:
         register_tuned_inkling(tuned_model_id)
+    # Arm D serving path B (arm_d/serving_shim.py): both the tuned and naive
+    # base systems are served locally via the Tinker shim under these fixed
+    # ids — register both unconditionally (no env dependency, unlike the
+    # Together-console-assigned id above).
+    register_inkling_small("armd-inkling-small-tuned")
+    register_inkling_small("thinkingmachines/Inkling-Small")
