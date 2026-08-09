@@ -23,7 +23,10 @@ from settings.pricing import (
     INKLING_INPUT_COST_PER_TOKEN,
     INKLING_MODEL_IDS,
     INKLING_OUTPUT_COST_PER_TOKEN,
+    INKLING_SMALL_INPUT_COST_PER_TOKEN,
+    INKLING_SMALL_OUTPUT_COST_PER_TOKEN,
     TUNED_INKLING_MODEL_IDS,
+    register_inkling_small,
     register_pricing,
     register_tuned_inkling,
 )
@@ -134,3 +137,32 @@ def test_register_pricing_skips_served_id_when_env_unset(monkeypatch) -> None:
     litellm.model_cost.pop("some-id-that-should-not-appear", None)
     register_pricing()  # must not raise with the env var absent
     assert "some-id-that-should-not-appear" not in litellm.model_cost
+
+
+def test_register_pricing_prices_both_shim_ids_at_inkling_small_rates() -> None:
+    # Arm D serving path B (arm_d/serving_shim.py): both the tuned and naive
+    # base systems are served locally via the Tinker shim, under fixed ids,
+    # through the openai provider. Both must price nonzero at the
+    # Inkling-Small rate (distinct from full Inkling's rate).
+    for model_id in ("armd-inkling-small-tuned", "thinkingmachines/Inkling-Small"):
+        litellm.model_cost.pop(model_id, None)
+    register_pricing()
+    for model_id in ("armd-inkling-small-tuned", "thinkingmachines/Inkling-Small"):
+        prompt_cost, completion_cost = litellm.cost_per_token(
+            model=model_id,
+            custom_llm_provider="openai",
+            prompt_tokens=1000,
+            completion_tokens=1000,
+        )
+        assert prompt_cost == pytest.approx(1000 * INKLING_SMALL_INPUT_COST_PER_TOKEN)
+        assert completion_cost == pytest.approx(1000 * INKLING_SMALL_OUTPUT_COST_PER_TOKEN)
+        assert prompt_cost > 0 and completion_cost > 0
+
+
+def test_register_inkling_small_prices_arbitrary_id() -> None:
+    register_inkling_small("some-inkling-small-served-id")
+    entry = litellm.model_cost["some-inkling-small-served-id"]
+    assert entry["input_cost_per_token"] == INKLING_SMALL_INPUT_COST_PER_TOKEN
+    assert entry["output_cost_per_token"] == INKLING_SMALL_OUTPUT_COST_PER_TOKEN
+    assert entry["litellm_provider"] == "openai"
+    assert entry["mode"] == "chat"

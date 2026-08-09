@@ -1,10 +1,10 @@
 """$0 tests for the Arm D eval driver. The subprocess runner is injected (records
-argv + env), so no eval, no Together calls, no spend."""
+argv + env), so no eval, no shim calls, no Tinker/Together calls, no spend."""
 import json
 
 import pytest
 
-from scripts.run_arm_d_eval import EVAL_SPLITS, run_arm_d_eval
+from scripts.run_arm_d_eval import EVAL_SPLITS, SHIM_API_BASE, run_arm_d_eval
 
 
 class _CapturingRunner:
@@ -18,7 +18,7 @@ class _CapturingRunner:
 def _run(tmp_path, **kw):
     runner = _CapturingRunner()
     index = run_arm_d_eval(
-        tuned_model_id="acct/armd-inkling-lora",
+        tuned_model_id="armd-inkling-small-tuned",
         index_path=tmp_path / "index.json",
         metrics_root=tmp_path / "metrics",
         runner=runner,
@@ -40,23 +40,23 @@ def test_runs_both_systems_across_all_four_splits(tmp_path):
     assert len(banking) == 2  # once per system
 
 
-def test_each_system_wires_its_own_model_through_together_seam(tmp_path):
+def test_each_system_wires_its_own_model_through_the_shim_seam(tmp_path):
     runner, index = _run(tmp_path)
     for argv, env in runner.calls:
-        assert env["AGENT_API_BASE"] == "https://api.together.xyz/v1"
+        assert env["AGENT_API_BASE"] == SHIM_API_BASE
         assert env["HARNESS_VERSION"] == "v0.1"
         assert env["AGENT_MODEL"].startswith("openai/")
     tuned = [e for e in index if e["system"] == "tuned"]
     base = [e for e in index if e["system"] == "base_control"]
-    assert all(e["agent_model"] == "openai/acct/armd-inkling-lora" for e in tuned)
-    assert all(e["agent_model"] == "openai/thinkingmachines/Inkling" for e in base)
+    assert all(e["agent_model"] == "openai/armd-inkling-small-tuned" for e in tuned)
+    assert all(e["agent_model"] == "openai/thinkingmachines/Inkling-Small" for e in base)
 
 
 def test_uses_preregistered_seeds_and_writes_index(tmp_path):
     runner, index = _run(tmp_path)
     for argv, _env in runner.calls:
         assert "--seed-start" in argv and argv[argv.index("--seed-start") + 1] == "2001"
-        assert "--repeats" in argv and argv[argv.index("--repeats") + 1] == "5"
+        assert "--repeats" in argv and argv[argv.index("--repeats") + 1] == "3"
         assert "--metrics-json" in argv  # per-repeat metrics captured
     saved = json.loads((tmp_path / "index.json").read_text())
     assert saved == index
