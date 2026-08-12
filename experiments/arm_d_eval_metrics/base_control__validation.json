@@ -1,0 +1,26 @@
+[
+  {
+    "run_id": "validation_20260809_181335",
+    "seed": 2001,
+    "pass_rate": 0.8285714285714286,
+    "cost_per_successful_task": 0.055497037931034485,
+    "cost_per_task": 0.04598326,
+    "harness_error_count": 0
+  },
+  {
+    "run_id": "validation_20260809_183449",
+    "seed": 2002,
+    "pass_rate": 0.8285714285714286,
+    "cost_per_successful_task": 0.054098079310344833,
+    "cost_per_task": 0.04482412285714286,
+    "harness_error_count": 0
+  },
+  {
+    "run_id": "validation_20260809_185552",
+    "seed": 2003,
+    "pass_rate": 0.8857142857142857,
+    "cost_per_successful_task": 0.05322978064516129,
+    "cost_per_task": 0.04714637714285714,
+    "harness_error_count": 0
+  }
+]

@@ -1,0 +1,1172 @@
+[
+  {
+    "task_id": "[mobile_data_issue]airplane_mode_on|bad_network_preference[PERSONA:Hard]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_025738",
+    "sha256": "158970e0e14559395ecce0fa1eb1685c9575582c726af705ac04a4186f0dd3ff"
+  },
+  {
+    "task_id": "72",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_221345",
+    "sha256": "be62432fc6f07c2c675ae71bca7567763a3c95ab729cb342eee54940ea7b8f0f"
+  },
+  {
+    "task_id": "36",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_002215",
+    "sha256": "bac9a1d83c2c0727d4e3057bb9063d750384eaf3aac994e73e61314f62de153a"
+  },
+  {
+    "task_id": "41",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_221345",
+    "sha256": "fb5b29ce7304bb68df024d34782a421e7a0b2d29be038785ed74554fb7403ffc"
+  },
+  {
+    "task_id": "[service_issue]break_apn_settings|lock_sim_card_pin|overdue_bill_suspension|unseat_sim_card[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_014804",
+    "sha256": "0de98db335b86df27928f08d1eeb18b8676d4af33c5f9c64e6434247ebdbbefd"
+  },
+  {
+    "task_id": "11",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_001049",
+    "sha256": "e49db27c374e55b07ad9e925eee1626545cc08ced0821f6673168e51341b6b9d"
+  },
+  {
+    "task_id": "47",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_215322",
+    "sha256": "7c0b8bb2600c815a804e84f718b8c2b6e26f3e3b79ae54421470afb4238297c3"
+  },
+  {
+    "task_id": "12",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_001049",
+    "sha256": "ab7b9a57e569389416c5ba19d7adea394c9db4b04c7be53ca64c0abbae5298cf"
+  },
+  {
+    "task_id": "42",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_003519",
+    "sha256": "aa1ee483956b428642038b40e4a4e877fc458e749c5109fcec35a46159ed3ce7"
+  },
+  {
+    "task_id": "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_saver_mode_on|user_abroad_roaming_disabled_on[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_004643",
+    "sha256": "1b0e03b4d6caf9041685edf4bc3dd9f3db38dec07eb9897681ef6f4f246ef0c5"
+  },
+  {
+    "task_id": "22",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_235048",
+    "sha256": "91ea64403e08b7500a22cea57f8e7f497df95178ae02977bb36f99e28f2fda62"
+  },
+  {
+    "task_id": "46",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_215322",
+    "sha256": "8f008f93dea0f86eb0cedb911f517d440807793d020ca3c34ce287126b83f4dc"
+  },
+  {
+    "task_id": "[mobile_data_issue]data_mode_off|data_usage_exceeded[PERSONA:None]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_025738",
+    "sha256": "8409b58bdf4841e4acf417baca1611cf9e1f136911ed8e68f3939889156f7ce1"
+  },
+  {
+    "task_id": "85",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_221345",
+    "sha256": "555c7493faa9b3e59bfec3381be5eade901ff28e569e008269ab2d896e5daa96"
+  },
+  {
+    "task_id": "0",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_003519",
+    "sha256": "9a9b7970437ca3d10485d0b0d54f78a70a176f7b39353b131237c8d0c97cd2ea"
+  },
+  {
+    "task_id": "4",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_003519",
+    "sha256": "ed7b69fe1734c094eac833671670808033f733c474c6c9954c80fb00df1f651f"
+  },
+  {
+    "task_id": "50",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_221345",
+    "sha256": "b71f99630b8215bd38a89eb9069ae4fc4b5fb893245f23145fd5273d76dfc48f"
+  },
+  {
+    "task_id": "16",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_235048",
+    "sha256": "488d01124f509125deb64207740d637fb897a6c5f6baf07a16f7629cd767d6de"
+  },
+  {
+    "task_id": "[service_issue]airplane_mode_on|break_apn_settings[PERSONA:Hard]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_004643",
+    "sha256": "091e1639de568262521205194eb2e040618a13b8b92328aad84a52940423f325"
+  },
+  {
+    "task_id": "52",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_221345",
+    "sha256": "357623b778561a8840eedda81ee842e7b8275653f7bb1387f98b9a884785d93b"
+  },
+  {
+    "task_id": "[mobile_data_issue]data_usage_exceeded|user_abroad_roaming_enabled_off[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_014804",
+    "sha256": "3b5457a4f0ffcfbd2e50b78aadcdd31d8faeda0235aa04a2fb8ef3949318c857"
+  },
+  {
+    "task_id": "110",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_215322",
+    "sha256": "02584c6f297ef3f9dcc8ac863d121e516b5640993febad7f3f34bec0e5eb39f7"
+  },
+  {
+    "task_id": "42",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_001049",
+    "sha256": "5ae32d36dffdbb400d5be05dcd4cc3bf40f150e924a4038e01255cb374ae86f7"
+  },
+  {
+    "task_id": "38",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_003519",
+    "sha256": "32eb2b610e123760a615459cec8ba8aa626f2f93f43c916b40f7ca4884cad6a6"
+  },
+  {
+    "task_id": "47",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_221345",
+    "sha256": "adf79a9349de8cb487cd5d85f9eab43da5eba57b225d77f351d1a24afe30a992"
+  },
+  {
+    "task_id": "38",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_002215",
+    "sha256": "9a7a0208c30c24f928727dc2beeb1f490aa7b4cae6e621e1918fb1eae6b2c5ad"
+  },
+  {
+    "task_id": "112",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_215322",
+    "sha256": "dd039d96d34015661be5c68e225e4f3605505f9cbb86442d4f3bf82fe3d9935a"
+  },
+  {
+    "task_id": "[service_issue]airplane_mode_on|unseat_sim_card[PERSONA:None]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_025738",
+    "sha256": "3067ee8c1950b51c72b5ffd0c6102e33e22b368ad1a04712cc98f7bdca51ae87"
+  },
+  {
+    "task_id": "38",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_001049",
+    "sha256": "f2e3ec32a1dd98dc58990d26fb0df20c5585363e9f64a113be88cbc9f108599e"
+  },
+  {
+    "task_id": "[mobile_data_issue]data_saver_mode_on|data_usage_exceeded[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_025738",
+    "sha256": "a9fb5fa753eaa990eedccd4fba4d65c7f4a982686e13e8ae1cc5b8e3cc39cd2c"
+  },
+  {
+    "task_id": "[mms_issue]bad_network_preference|user_abroad_roaming_disabled_on[PERSONA:None]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_014804",
+    "sha256": "c9ba2f865ee687bbc3ffe577727a5ae4459a3f97c5a9fd743530bf5e7652f91c"
+  },
+  {
+    "task_id": "[service_issue]airplane_mode_on|break_apn_settings[PERSONA:Hard]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_014804",
+    "sha256": "09935e4849b66f066f79567e365acf36761d1464efe318f4e85cdb40589353bb"
+  },
+  {
+    "task_id": "1",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_221345",
+    "sha256": "e9e12730950ebe66d200540276d1d4c2abf9e1407198ec2957adfce44d03e844"
+  },
+  {
+    "task_id": "[service_issue]airplane_mode_on|lock_sim_card_pin|overdue_bill_suspension|unseat_sim_card[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_004643",
+    "sha256": "0967bf476d1bbc7631922eacac7a8bd890ceb5caf4047013a7907df5e4553832"
+  },
+  {
+    "task_id": "49",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_001049",
+    "sha256": "afee447df7433560a0263fe07f48e5f46cda6b372ae7e34b420aabe411429886"
+  },
+  {
+    "task_id": "50",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_215322",
+    "sha256": "46928089d97ac985101631c31111c2a832da48a388dc51547d98b44e394d283e"
+  },
+  {
+    "task_id": "40",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_003519",
+    "sha256": "5aae1d7dcb93d3548a8159c84906d6169dd3465c98dbc25b1b1064817cfae973"
+  },
+  {
+    "task_id": "42",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_002215",
+    "sha256": "bdc02ba9f232429c0e9572c36658a7b0690257313c0fa42e7fa3d479b0bf9343"
+  },
+  {
+    "task_id": "[mobile_data_issue]airplane_mode_on|bad_network_preference[PERSONA:Hard]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_004643",
+    "sha256": "d2f1bda1ebade2d379e93f21ed018d0ca505748a68c50d2d7f3755ad3d4d0ece"
+  },
+  {
+    "task_id": "[mms_issue]bad_network_preference|user_abroad_roaming_disabled_on[PERSONA:None]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_025738",
+    "sha256": "eeadb9929c246b4532a44d1f4793bd118580a11092449e3d5898b90e8a9498b5"
+  },
+  {
+    "task_id": "[service_issue]break_apn_settings|lock_sim_card_pin|overdue_bill_suspension|unseat_sim_card[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_004643",
+    "sha256": "fd1eb723ddeae4db1ad392d2217fb1c3e4d6c6b3cc4de46c0f1aca5a45add220"
+  },
+  {
+    "task_id": "[mobile_data_issue]data_usage_exceeded|user_abroad_roaming_enabled_off[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_004643",
+    "sha256": "49c70ff790bd76406a4b0555d6c52a507a178624aa3618d5c1ab7df21729ddf7"
+  },
+  {
+    "task_id": "36",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_003519",
+    "sha256": "fea2b4a5242f0f44a36b111e314606cb3bde2ecd4765eb1c01faac0c0941a8c2"
+  },
+  {
+    "task_id": "73",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_221345",
+    "sha256": "38acdbcfe26c2e5d5ab7d85953ccfb80c2afb175187ba3b9643156c2688f4e82"
+  },
+  {
+    "task_id": "3",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_221345",
+    "sha256": "3a19fdd2ba692a72c7406c5ccd31822a54f8a69b120199b84f00b915ec12633d"
+  },
+  {
+    "task_id": "6",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_221345",
+    "sha256": "572173ce180487ff0c90c48cd5fcc9bbf8cb85fa6a5219fbc693ca9371d7b35e"
+  },
+  {
+    "task_id": "4",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_002215",
+    "sha256": "2bdc2593f9a0728eb48baf5110f09fb116af9abf6dc7f72a3d1d988ac0bb5d82"
+  },
+  {
+    "task_id": "[mobile_data_issue]airplane_mode_on|bad_network_preference[PERSONA:Hard]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_014804",
+    "sha256": "a6c3f4c3eab8f882121e4b5f48bce87359e83ca1efadda4f5beba5de4b011369"
+  },
+  {
+    "task_id": "6",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_235048",
+    "sha256": "a072aadcfd34c8236143145eaf984474ef21793650483bc2097c312e0f0d1484"
+  },
+  {
+    "task_id": "52",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_215322",
+    "sha256": "aefd1b27c69b49be37689f13a5d2982007e656f91624f7fb84f524ed5258d7a8"
+  },
+  {
+    "task_id": "19",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_221345",
+    "sha256": "93561ec60662ea59f8741e5ff6299d171191a314a5434b1b988e950c0a392e0b"
+  },
+  {
+    "task_id": "57",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_221345",
+    "sha256": "3499070ac664066d0beba40c3b29bd22581520447c631346079f3966773a8734"
+  },
+  {
+    "task_id": "10",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_001049",
+    "sha256": "7c420c774ab471d9c5e5dda97b25cfc4366006bbcb86a6d534b5c1349e2adb51"
+  },
+  {
+    "task_id": "40",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_002215",
+    "sha256": "3c3518e23f46bab214e4ce27004be5d4e5c2f8d6ac43d0c5978e0aa9f3d67e03"
+  },
+  {
+    "task_id": "28",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_001049",
+    "sha256": "a92ad792a6ae4afa8572d954a2774441a29c7882ac90d12af2f54c6b59d7209c"
+  },
+  {
+    "task_id": "33",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_001049",
+    "sha256": "832fff91d00fd5fd9d7715976d059f4c5fb48493433845d50b460b87bb052ab7"
+  },
+  {
+    "task_id": "[mobile_data_issue]airplane_mode_on|bad_network_preference|data_usage_exceeded|user_abroad_roaming_disabled_off[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_004643",
+    "sha256": "c4d16fb57998921ab10d26296918f2772fb5a09e744b3111b0ad8f7563827c32"
+  },
+  {
+    "task_id": "19",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_235048",
+    "sha256": "91fea687a2e8ef6f35fc88425b3725fd63c78690d1622a608cc5a2be02fd46f1"
+  },
+  {
+    "task_id": "20",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_001049",
+    "sha256": "89a299b0ed48adb2f230cfb25586e87a7c2338b30638da5b60236cb5e0e44871"
+  },
+  {
+    "task_id": "49",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_002215",
+    "sha256": "fa73b51f2e82c12e64e7dfc15f17260e33080b9031473775cd907ded82fa1123"
+  },
+  {
+    "task_id": "41",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_002215",
+    "sha256": "846bc586c7f968feebf770b7cf165c321632654efe113047109133add75266af"
+  },
+  {
+    "task_id": "22",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_221345",
+    "sha256": "bef6ee0938dd55d7fac959990cea893ca3401eeb41ce86441db41be3b9634668"
+  },
+  {
+    "task_id": "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_saver_mode_on|user_abroad_roaming_disabled_on[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_025738",
+    "sha256": "b9dcb7ecfb4f6910793cbe6daf9045c0183d37be62486122c206d096dba61824"
+  },
+  {
+    "task_id": "85",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_215322",
+    "sha256": "2c4de29a697e41b7544cbe3938a3a189707a177c3f07b21f2825e24baf8bcfc7"
+  },
+  {
+    "task_id": "110",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_235048",
+    "sha256": "9b8089697aa02354930d1c8bd3e77e989001d7b82a5cd85e88de656e497e6361"
+  },
+  {
+    "task_id": "[mobile_data_issue]bad_network_preference|data_mode_off|data_saver_mode_on|data_usage_exceeded|user_abroad_roaming_disabled_off[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_004643",
+    "sha256": "f121b6fec82bed136ba1b00f6f70e4034578dd889144039611a98a201bd5bd8d"
+  },
+  {
+    "task_id": "[service_issue]airplane_mode_on|break_apn_settings|lock_sim_card_pin[PERSONA:None]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_014804",
+    "sha256": "a56496162b27657aad123f4bcca856b8e1de4a6a0a108007cde549e973bdfb38"
+  },
+  {
+    "task_id": "3",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_215322",
+    "sha256": "903322b867f79e92270cc6ae2bab36ba575447e9f2702d619891c479baf974f9"
+  },
+  {
+    "task_id": "1",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_235048",
+    "sha256": "cc673d3a2875190764669c3ecc938b9f0b5715b48115168dab0d418ab84ab1e1"
+  },
+  {
+    "task_id": "[mms_issue]bad_wifi_calling|break_apn_mms_setting|data_mode_off|data_usage_exceeded|unseat_sim_card[PERSONA:None]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_025738",
+    "sha256": "2b88f2ee6dd26446a8f503d8fd0493200a13b9144f866e8989258d7183c41aed"
+  },
+  {
+    "task_id": "[mobile_data_issue]airplane_mode_on|bad_network_preference|data_usage_exceeded|user_abroad_roaming_disabled_off[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_025738",
+    "sha256": "426ff46c4fd0d2e6f65f067f6fe66186eb621cc7712390ba0f2982205d33ced1"
+  },
+  {
+    "task_id": "[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_saver_mode_on|user_abroad_roaming_disabled_on[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_014804",
+    "sha256": "fa42a7145582ffaa82615bf4377f40bbc4fbd1f7c496af4946f2bc302f55f3fa"
+  },
+  {
+    "task_id": "73",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_235048",
+    "sha256": "179168849d93e6f717295aee3563bfafce29264e05f751650869f618f0996289"
+  },
+  {
+    "task_id": "[mobile_data_issue]data_saver_mode_on|data_usage_exceeded[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_014804",
+    "sha256": "3ec5c13a511e827d6d43029a6330eb55b140476ae579695ce021f3949e82289b"
+  },
+  {
+    "task_id": "93",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_221345",
+    "sha256": "a6db061f604cf34f5e53226a55e7e46a7988f95c50356ab7c6a84af9019d2e3e"
+  },
+  {
+    "task_id": "85",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_235048",
+    "sha256": "0dbdd682d6d14cafaf47df0f8ef4210bdbb0f34d08c2ca79184ca725746ecfbf"
+  },
+  {
+    "task_id": "28",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_002215",
+    "sha256": "6655a7b9805a54a68e9efbed7b2d868c4e86fdfa04271d5eabd26aed8411ebbd"
+  },
+  {
+    "task_id": "107",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_215322",
+    "sha256": "97aa00831fc637f5ed11d3f72eaf59b57054dc9e72983f0e102d32618b6552cf"
+  },
+  {
+    "task_id": "35",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_235048",
+    "sha256": "163830bf644d4f63e8c5856ac27c7654e0ff87ee43c624fe3bf758775f052788"
+  },
+  {
+    "task_id": "66",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_235048",
+    "sha256": "389da0f9f05886e52fe85f09ab4e37e3817adbd202241f23956a2f3d727ddf2a"
+  },
+  {
+    "task_id": "112",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_221345",
+    "sha256": "f04b87ff10d47c4622ccf59a62a1ff9560f9d46eea78c984d131c9aa3d27c7e4"
+  },
+  {
+    "task_id": "[service_issue]airplane_mode_on|break_apn_settings[PERSONA:Hard]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_025738",
+    "sha256": "8a5e33c27c51e6075d4e7036a89a8760a0d9f7e53900974fa851a65286a52683"
+  },
+  {
+    "task_id": "93",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_215322",
+    "sha256": "2ffc4047a9f1e5fb41e7362acb0919867f193cf5e57844aa6c02db4e58a1eea1"
+  },
+  {
+    "task_id": "[mobile_data_issue]bad_network_preference|data_saver_mode_on|data_usage_exceeded[PERSONA:Hard]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_004643",
+    "sha256": "b3f71f2c5afebc290920286e5cd27b811407b5a106e216fd480a0f937cef3041"
+  },
+  {
+    "task_id": "113",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_221345",
+    "sha256": "98bd12419250a10fd03e0d4df48f497d272e0873558c7fe327b201f882a5232a"
+  },
+  {
+    "task_id": "49",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_003519",
+    "sha256": "45661f6244098cf68a333e2456b9db93427bbe525b07bf0ee1869d943b915549"
+  },
+  {
+    "task_id": "5",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_001049",
+    "sha256": "b91020e2eade83f3ade4bb7632e61c77dc65f33baadef08675267ea7e971fa7f"
+  },
+  {
+    "task_id": "27",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_002215",
+    "sha256": "4cf398955227d0edf86e792185e4499b517ddff7a71855d383a343a4dce85af8"
+  },
+  {
+    "task_id": "[service_issue]airplane_mode_on|break_apn_settings|contract_end_suspension|unseat_sim_card[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_014804",
+    "sha256": "1765cdd02a453f75a170f3e444c9930df1f6d5523e6e0c6657c4761bb2042394"
+  },
+  {
+    "task_id": "28",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_003519",
+    "sha256": "8da0f1ee54cfb9700e0270b7779711af3687d99b0d86a8c6e6fce8b2ec42b255"
+  },
+  {
+    "task_id": "58",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_235048",
+    "sha256": "83f565fc8b21fb461501ce95a5ef6cf70ee472df90606ef18b5c31db0b7132da"
+  },
+  {
+    "task_id": "46",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_002215",
+    "sha256": "1829c23e7566b532ca70ea4806b18d2b814f380db09648f8812ae9b8d46a0b65"
+  },
+  {
+    "task_id": "[mms_issue]airplane_mode_on|bad_network_preference|break_apn_mms_setting|break_app_storage_permission[PERSONA:None]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_004643",
+    "sha256": "1204150feaabdee2591ccd079665094d1ecdf15ee899d0aba4098b7df527fff6"
+  },
+  {
+    "task_id": "[service_issue]airplane_mode_on|break_apn_settings|contract_end_suspension|unseat_sim_card[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_025738",
+    "sha256": "71c57d4b783725532c01d5332b3441561aa370f3c49e73f751560b084dc5ce51"
+  },
+  {
+    "task_id": "47",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_001049",
+    "sha256": "0a64724bdd233868f146d753bf2d116d7fcbd8dd035497c291b39a9a2a994cf3"
+  },
+  {
+    "task_id": "[service_issue]airplane_mode_on|break_apn_settings|lock_sim_card_pin|overdue_bill_suspension|unseat_sim_card[PERSONA:None]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_025738",
+    "sha256": "7e1ee4f7f1badc9d48391197b831e7aef8928512dc6eb41ce25f9b847d11f5f7"
+  },
+  {
+    "task_id": "52",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_235048",
+    "sha256": "9b8c4a81abc774c8d0c75bca233f5e1e99e477282b3f530c8587d53db2dfd7d6"
+  },
+  {
+    "task_id": "[service_issue]airplane_mode_on|break_apn_settings|lock_sim_card_pin[PERSONA:None]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_004643",
+    "sha256": "6ac6bc5e9229f40fd0a41e4c538ba23bbe7889a665fb188c837f837fadd374ab"
+  },
+  {
+    "task_id": "1",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_001049",
+    "sha256": "badc382f3eda9cd2622cdc9cca59ad05d4cd76a089d50c17b24832630fd2684a"
+  },
+  {
+    "task_id": "66",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_221345",
+    "sha256": "ad11a8b801f3c0b319e4a7e730ba55362c5ed13d9067fda56f40aecf9ea03c5d"
+  },
+  {
+    "task_id": "27",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_003519",
+    "sha256": "b1a403101d341af3ed235d6ae95468926896b2a8d52b8bca27668d65f10a71d4"
+  },
+  {
+    "task_id": "3",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_003519",
+    "sha256": "4788493143996251139e1c42520d94ea056a773bffba99948079d27d48bc7226"
+  },
+  {
+    "task_id": "57",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_215322",
+    "sha256": "bb51a3be80b0119b48f315d851b9dcbe3dfe57d883794574b271c22341fc1855"
+  },
+  {
+    "task_id": "22",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_215322",
+    "sha256": "205883660f1f564a552357ff4173374d13c734109f7185c09548c800e81e81ec"
+  },
+  {
+    "task_id": "[service_issue]break_apn_settings|lock_sim_card_pin|overdue_bill_suspension|unseat_sim_card[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_025738",
+    "sha256": "74a84c3dd12beeed2616127523ecdfec8e07c949e8447403efc1563cfe9c2f46"
+  },
+  {
+    "task_id": "46",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_001049",
+    "sha256": "427b4134a392cc3185d61fe91b464cd669d8ff695eb56d0a396aada1a33927a9"
+  },
+  {
+    "task_id": "3",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_001049",
+    "sha256": "3152f18ea647f78693feba005cda37614268e95d0c97586e6895556059173541"
+  },
+  {
+    "task_id": "46",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_221345",
+    "sha256": "cd501e3f05d7df6d174f0a2d5557e78422f790d014d35090e427ad8b0556b378"
+  },
+  {
+    "task_id": "66",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_215322",
+    "sha256": "d7130456173e4cf0fd14d8153a15ab6aeb16a73d257a8cf23941431899f85831"
+  },
+  {
+    "task_id": "[mms_issue]airplane_mode_on|bad_network_preference|break_apn_mms_setting|break_app_storage_permission[PERSONA:None]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_025738",
+    "sha256": "c89c5a831ff05fe7ee911fb6cb36d39c4b73fa060484fcd67a1959a86d2eedc3"
+  },
+  {
+    "task_id": "[service_issue]airplane_mode_on|break_apn_settings|lock_sim_card_pin[PERSONA:None]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_025738",
+    "sha256": "5c77fc0650e975503bd9e2b9395eb49a033f71300a5e5a8ee67b20fd3c800966"
+  },
+  {
+    "task_id": "[mms_issue]airplane_mode_on|bad_network_preference|break_apn_mms_setting|data_usage_exceeded[PERSONA:Hard]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_014804",
+    "sha256": "39ce135753b29db9922341cc88bc08f0abb02ae9c54410c0d100c1302c9d05a3"
+  },
+  {
+    "task_id": "113",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_235048",
+    "sha256": "9fc31a8b5807c38744f78d6217078b3af37aaa9be70d88041813d0a61b504252"
+  },
+  {
+    "task_id": "16",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_221345",
+    "sha256": "61f1d48ff838c6df6c3c7fd05625a6518512ee80838da1c42e40414b8a66823d"
+  },
+  {
+    "task_id": "47",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_002215",
+    "sha256": "3e81bac02308e801253b1626215c76d65474b8d84482915e65dce8cb8f360c5c"
+  },
+  {
+    "task_id": "[mobile_data_issue]airplane_mode_on|bad_network_preference|user_abroad_roaming_enabled_off[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_004643",
+    "sha256": "d9f7f3c58bb3f26997291ee119a6608ca54f49b08e1a745b524bc8070003bb78"
+  },
+  {
+    "task_id": "[mms_issue]break_app_storage_permission|unseat_sim_card|user_abroad_roaming_disabled_on[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_004643",
+    "sha256": "11343596983bced25be8f4fd5d5c738cbf239e45612d384c1f6702cb4874ec13"
+  },
+  {
+    "task_id": "12",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_002215",
+    "sha256": "c1c5507b22c77c8feaf7d172895bbf6fbcc160244fb1962448000c646f93b8df"
+  },
+  {
+    "task_id": "[mobile_data_issue]airplane_mode_on|bad_network_preference|user_abroad_roaming_enabled_off[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_025738",
+    "sha256": "f53305611c93060d4e57c19ce69f5bb5ee5e0bcd4f10379884c9ed9b1e9079ba"
+  },
+  {
+    "task_id": "10",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_002215",
+    "sha256": "aea46dc697e32e6115319a78b4276c1e80b15132dc4825764da1b0440df1fcd8"
+  },
+  {
+    "task_id": "46",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_235048",
+    "sha256": "a24ba3f87fc1236bab57de76b3cadd9626e8589c5c373fedf04dca901f8fd2e6"
+  },
+  {
+    "task_id": "[service_issue]airplane_mode_on|lock_sim_card_pin|unseat_sim_card[PERSONA:Hard]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_014804",
+    "sha256": "d2ddb5820c5c566ecf9d6509ad52eeaf4d1940a4a32bf799f973e4de1c059cab"
+  },
+  {
+    "task_id": "15",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_215322",
+    "sha256": "4011fbb784394328b87b10b15d214928b8b0ded5c5924b7c851e5a93122586e7"
+  },
+  {
+    "task_id": "[service_issue]break_apn_settings|overdue_bill_suspension|unseat_sim_card[PERSONA:Hard]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_025738",
+    "sha256": "0db16ddd5d1825a6bac704ef6ef194de501bf4ed458a20f89d0e5fbc042066c1"
+  },
+  {
+    "task_id": "[mms_issue]airplane_mode_on|bad_network_preference|bad_wifi_calling|break_apn_mms_setting|break_app_storage_permission|data_mode_off|data_usage_exceeded|unseat_sim_card[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_014804",
+    "sha256": "bf1d1a454326957c89ca4460c84214ee97b130c3e08530c81ff7593d3b6d0a45"
+  },
+  {
+    "task_id": "11",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_003519",
+    "sha256": "df681f6a5507d3707415bb6adc29629c13ccce134e2ad95b9328a7fe5625d09e"
+  },
+  {
+    "task_id": "[mobile_data_issue]bad_network_preference|data_mode_off|data_saver_mode_on|data_usage_exceeded|user_abroad_roaming_disabled_off[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_025738",
+    "sha256": "07efc10a57a08f09907dbe9f5c7524207666f03ccc3b5aa53ee78e0963dd5291"
+  },
+  {
+    "task_id": "1",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_215322",
+    "sha256": "8ea7bb4f572ed7740a4ee7e9672c007dc2eebc6cef591b3ea5a2ef5c12157545"
+  },
+  {
+    "task_id": "[mobile_data_issue]bad_network_preference|bad_vpn|data_mode_off|data_saver_mode_on[PERSONA:None]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_025738",
+    "sha256": "a5b2ff3e5d6cd7ace9189e0aca51155c4ba2423f4756eb92c192ba01b1800bc9"
+  },
+  {
+    "task_id": "47",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_235048",
+    "sha256": "d311d71fce2064b8958a7176cd17731248ab5303fb315117ae7fa0a942f39ed0"
+  },
+  {
+    "task_id": "[service_issue]airplane_mode_on|break_apn_settings|lock_sim_card_pin|overdue_bill_suspension|unseat_sim_card[PERSONA:None]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_004643",
+    "sha256": "2ee509f62f86c685a4ca4f5ded624a1d16d9d22c18accc6f396ba1a5129b1615"
+  },
+  {
+    "task_id": "1",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_002215",
+    "sha256": "0b05c2c9dd6582e035c5d91a3ee2977ab8c72e77e044542c37792fa43fce8395"
+  },
+  {
+    "task_id": "40",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_001049",
+    "sha256": "26158026f9499d7840193e70bce0927be5bc20062196c8a8fa424b84c7e27881"
+  },
+  {
+    "task_id": "14",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_235048",
+    "sha256": "071f9aac0b3dc98ea197bd3244972aae22a093b635c2aec5d61362626d6a4dcf"
+  },
+  {
+    "task_id": "[mobile_data_issue]data_mode_off|data_usage_exceeded|user_abroad_roaming_disabled_off[PERSONA:Hard]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_004643",
+    "sha256": "e2337d4ecd4b5519e69c7470c7eb0e5e414bd00792546b0c55db19691b964ba7"
+  },
+  {
+    "task_id": "12",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_003519",
+    "sha256": "714dca1f4a81254df7ca80f8620c4a9c3aba2d041bee2c4165c73e69164612bc"
+  },
+  {
+    "task_id": "41",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_001049",
+    "sha256": "05e13d60ee2f69fab507a4aa638cf93d1e80b04d530e4bde356a63120a23812f"
+  },
+  {
+    "task_id": "73",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_215322",
+    "sha256": "9f535723d4762bfc95592708a0a3eef5bc85994e7529961ff02981058e1a0899"
+  },
+  {
+    "task_id": "[mobile_data_issue]bad_network_preference|bad_vpn|data_mode_off|data_saver_mode_on[PERSONA:None]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_004643",
+    "sha256": "dfd2d1a78b1978d6e5df91e4f06c727bdf43f371a064e03a01afab36cc43b9fb"
+  },
+  {
+    "task_id": "[service_issue]airplane_mode_on|lock_sim_card_pin|unseat_sim_card[PERSONA:Hard]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_004643",
+    "sha256": "5245ba3f0c57bffcee48e930f4e40d8b70fef43ebc1539bef04ebbc943909899"
+  },
+  {
+    "task_id": "[mms_issue]airplane_mode_on|bad_network_preference|bad_wifi_calling|break_apn_mms_setting|break_app_storage_permission|data_mode_off|data_usage_exceeded|unseat_sim_card[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_025738",
+    "sha256": "0ebb2b9862870ad9e67126e74d86debfa3a15ec269e65af39be176a88cfa5764"
+  },
+  {
+    "task_id": "16",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_215322",
+    "sha256": "6d0836c3dc6681ace79c2677d0e968cebfd390c4abbc728eb9aebc7f7b8c41d5"
+  },
+  {
+    "task_id": "15",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_221345",
+    "sha256": "522bb9a8f72fb06932fd9924dce548363e3f19d83d8a13e7d3fd4e187b4b18a7"
+  },
+  {
+    "task_id": "[mobile_data_issue]data_mode_off|data_usage_exceeded|user_abroad_roaming_disabled_off[PERSONA:Hard]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_014804",
+    "sha256": "67eeb76ad7b80dd087f8387770ffe3c1cc94e21d5ae820050c3ddfe74f49f343"
+  },
+  {
+    "task_id": "0",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_002215",
+    "sha256": "1a7b93bb6790e794f421ee90d24181c26924b704a7800617655b5b820a384e7d"
+  },
+  {
+    "task_id": "[service_issue]airplane_mode_on|break_apn_settings|lock_sim_card_pin|overdue_bill_suspension|unseat_sim_card[PERSONA:None]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_014804",
+    "sha256": "e8efd9a6970f8d067f80fc85cedc443447ed2efa394a245b71c462167feb37e9"
+  },
+  {
+    "task_id": "[mms_issue]bad_network_preference|user_abroad_roaming_disabled_on[PERSONA:None]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_004643",
+    "sha256": "08dcdfc3bacd78fe6bce272e5e8dca5e73f0e0b1c8be93db6cfb7a4d34defd1c"
+  },
+  {
+    "task_id": "6",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_215322",
+    "sha256": "9e1dcda925386321f54ddbf227487be5e7b5d4120b95c6cda11a4e9e5be259f7"
+  },
+  {
+    "task_id": "[mobile_data_issue]data_mode_off|data_usage_exceeded[PERSONA:None]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_004643",
+    "sha256": "29b264e838a8bdbee54d61ea652439b55ff9ea76cac3f46d5e3f7ff6ce37ea48"
+  },
+  {
+    "task_id": "0",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_001049",
+    "sha256": "72dff2754fd9fcd515326d2cad46952297722f57570550f843303bea879c6f20"
+  },
+  {
+    "task_id": "3",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_002215",
+    "sha256": "501a8ef74a38bb34649b8ec75d96e6b84d8cde28f997a3c372d3051b74ab4e59"
+  },
+  {
+    "task_id": "27",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_001049",
+    "sha256": "d066fdd41321fc2b14385f778717e881b530e90fd530558fe6edaaf27b387fd7"
+  },
+  {
+    "task_id": "112",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_235048",
+    "sha256": "0770457cecdef3b2f40e18e1bd01e7e84fec11857a48d04f651305d96db518bd"
+  },
+  {
+    "task_id": "14",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_221345",
+    "sha256": "b3897bb56e421a1fc251ad36e5d9133ad2e9d2f950d25ff0e1e847a6f67bfa21"
+  },
+  {
+    "task_id": "1",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_003519",
+    "sha256": "cd5483b720cb99a4c99d6e8ce2f3600f19263a1f60652c410ca4370484b45060"
+  },
+  {
+    "task_id": "[mms_issue]airplane_mode_on|bad_network_preference|break_apn_mms_setting|break_app_storage_permission[PERSONA:None]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_014804",
+    "sha256": "5c3bccc8eee09bb91b5449693f4113ad1b89a8855c9e4d51a51a10b16ae317d5"
+  },
+  {
+    "task_id": "113",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_215322",
+    "sha256": "1b460afaa0e3d9de1124255d98e76f695a793aa01bc7eda9827dfe74bc978984"
+  },
+  {
+    "task_id": "33",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_002215",
+    "sha256": "4d4d61aae15c3583697e16dbc104078ffd72a8aa6b038c4c2fc1aed02f815f00"
+  },
+  {
+    "task_id": "72",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_235048",
+    "sha256": "b6f58131dd378b12d544c327f4d25a97df63073c266364f99b8e1c1da73759ce"
+  },
+  {
+    "task_id": "46",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_003519",
+    "sha256": "fcc1048940a6910ac7a883dfa7bdc7876f67120db2d72baf1ebb21409ba46953"
+  },
+  {
+    "task_id": "[mobile_data_issue]data_saver_mode_on|data_usage_exceeded[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_004643",
+    "sha256": "3c07bf29c1baf5ac5e92a54adef89a646633b6c1d34548c48ca3cd1606f1f2ee"
+  },
+  {
+    "task_id": "[mobile_data_issue]bad_network_preference|data_saver_mode_on|data_usage_exceeded[PERSONA:Hard]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_014804",
+    "sha256": "bfb9560106d59e42f75725066779b3e57fdf74a3406a41babe95ff075b81b398"
+  },
+  {
+    "task_id": "72",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_215322",
+    "sha256": "d3b06eec4621a8e7e169e8d81e3efc3f11a56f6bf3e4be1a95eb7c9db387182d"
+  },
+  {
+    "task_id": "[mobile_data_issue]airplane_mode_on|bad_network_preference|data_usage_exceeded|user_abroad_roaming_disabled_off[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_014804",
+    "sha256": "3af46b6b21cdf106756e326e9dd1e4196f8abe8cdd5a94c033209d19d54ccb27"
+  },
+  {
+    "task_id": "47",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_003519",
+    "sha256": "c948183c7be72d67c8949da2be20fb63baf210b609869f3b398ea209bd33a55c"
+  },
+  {
+    "task_id": "[service_issue]lock_sim_card_pin|overdue_bill_suspension[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_004643",
+    "sha256": "9f2e8d723187ddb43752acad1eb39771c137240977763e3e29ee333dd87d2bcf"
+  },
+  {
+    "task_id": "[service_issue]lock_sim_card_pin|overdue_bill_suspension[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_025738",
+    "sha256": "86c6c40256c43969551f18ad9fac4d8fac262ef7cd72d68a8dbbcd80a276ad78"
+  },
+  {
+    "task_id": "36",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_001049",
+    "sha256": "d5fcedc135038019fb4ce599e5cc6059ce74ed23e9a6ad40e5e73c7fcc11f64a"
+  },
+  {
+    "task_id": "[mobile_data_issue]airplane_mode_on|bad_network_preference|user_abroad_roaming_enabled_off[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_014804",
+    "sha256": "6dabddcf774b36a4e68e1694206859329007668c2aabd4da63d3b780a1ee7433"
+  },
+  {
+    "task_id": "[mobile_data_issue]bad_network_preference|data_mode_off|data_saver_mode_on|data_usage_exceeded|user_abroad_roaming_disabled_off[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_014804",
+    "sha256": "2219b615fbbdb537bf3668b2e8ad55071d4527b1d42cacbcd11afb4866565146"
+  },
+  {
+    "task_id": "10",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_003519",
+    "sha256": "6f71935039e40ca9ef50e63243f22b7f7f74c52630ee010f87fa8b91af5f3200"
+  },
+  {
+    "task_id": "[mms_issue]break_app_both_permissions|data_usage_exceeded[PERSONA:Hard]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_004643",
+    "sha256": "ded9b8b822ecb3572bd6708eef1bd23f9fa0da6c740dbee2668df24f08924b71"
+  },
+  {
+    "task_id": "58",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_221345",
+    "sha256": "a447435d206534a306063d7c059a222f04ddb6962fd97a77e459a4c7a818ece5"
+  },
+  {
+    "task_id": "4",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_221345",
+    "sha256": "7c79aba5156aa5e6a6ed9e58fef2fe5100cf216ed2be0692ff672a6a3373049f"
+  },
+  {
+    "task_id": "[service_issue]airplane_mode_on|lock_sim_card_pin|overdue_bill_suspension|unseat_sim_card[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_025738",
+    "sha256": "bb5e843adda564da887b55a46154c896f751ecac987446fcb9cc760dac5cdfef"
+  },
+  {
+    "task_id": "5",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_002215",
+    "sha256": "66c8217e91f36da8e2b18a4270797877e4c0b9b5295f39c2ee96fc99bd006ac4"
+  },
+  {
+    "task_id": "[service_issue]airplane_mode_on|unseat_sim_card[PERSONA:None]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_004643",
+    "sha256": "1bfaf0c0db00898e7a288cd9cd5a8e8f9d99ef17634dc0ba3225a990976ad377"
+  },
+  {
+    "task_id": "4",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_215322",
+    "sha256": "545efbb861bcad79cf8be7ca63d17b55e439d65341477d58a2fbe0f21586bca7"
+  },
+  {
+    "task_id": "57",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_235048",
+    "sha256": "be0f3b741e68390b67b35be2ab9d370f58277ec57561ee3fce8d18db19a62fe0"
+  },
+  {
+    "task_id": "[mobile_data_issue]bad_network_preference|bad_vpn|data_mode_off|data_saver_mode_on[PERSONA:None]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_014804",
+    "sha256": "646aef4e2da3c050f2d476382abe304869ef104d3e5ae1e45a20d3e09b291011"
+  },
+  {
+    "task_id": "5",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_003519",
+    "sha256": "c49dc47a96d86a4a388610fe43707022c004f54e925082330c9fa48dab35ba62"
+  },
+  {
+    "task_id": "93",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_235048",
+    "sha256": "0f5fe682e3769b030abf8673679726fb45bbf6136eccb413fa19f7fadd91ab6d"
+  },
+  {
+    "task_id": "14",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_215322",
+    "sha256": "9ad7cb85ecf36130f087ba03c227d0914061aa9f772770bdac20702c8b17a047"
+  },
+  {
+    "task_id": "[service_issue]airplane_mode_on|lock_sim_card_pin|unseat_sim_card[PERSONA:Hard]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_025738",
+    "sha256": "d3f4a8e8e69d0e5f25606894caeef9d44c9feac78e91a2385f9db43c1b1736dd"
+  },
+  {
+    "task_id": "41",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_215322",
+    "sha256": "ec9fe2f7ece9cd757c0d086e0c8b6c437a85be12b80925008a45bbc90a60674b"
+  },
+  {
+    "task_id": "58",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_215322",
+    "sha256": "2fb63d87d251b2f4f289fe9e6756b5a61b73cde341a4f93d1c197cc2a8a8a6d7"
+  },
+  {
+    "task_id": "[mobile_data_issue]data_mode_off|data_usage_exceeded[PERSONA:None]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_014804",
+    "sha256": "f62b0ebfcf991415b35040f0e6030de308448318d42b0ff465ec280d1ea590f4"
+  },
+  {
+    "task_id": "[mobile_data_issue]airplane_mode_on|bad_network_preference|data_mode_off|data_saver_mode_on|data_usage_exceeded|user_abroad_roaming_disabled_on[PERSONA:None]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_004643",
+    "sha256": "5b35570d8c445ccb1e64e0873f1b1398a564f78d2f958c6ed0a636704fe6d8c6"
+  },
+  {
+    "task_id": "35",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_215322",
+    "sha256": "0b2b637782db8e293b0a559664398f2a8e6559d19cdb6c200df11df2e31e7110"
+  },
+  {
+    "task_id": "[service_issue]airplane_mode_on|break_apn_settings|contract_end_suspension|unseat_sim_card[PERSONA:Easy]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_004643",
+    "sha256": "5855d7aa968300c44d730548127faedc1a1414b513aaf04d66acec4a14a79cae"
+  },
+  {
+    "task_id": "4",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_001049",
+    "sha256": "c05bd8b1279503913f9410da3b62405c6e41f30a1734454a35f17524d7c8d95e"
+  },
+  {
+    "task_id": "[service_issue]airplane_mode_on|unseat_sim_card[PERSONA:None]",
+    "domain": "telecom",
+    "source_run": "train_distill_telecom_20260807_014804",
+    "sha256": "938540aa68b48d7d19b7fc7f8d5623f09fa807c4a847a57dedcebc86453a01fc"
+  },
+  {
+    "task_id": "11",
+    "domain": "airline",
+    "source_run": "train_distill_airline_20260807_002215",
+    "sha256": "54713af97df536df87ce37bc0a3273bdf5a198f6e817850c423ef27f48d86936"
+  },
+  {
+    "task_id": "35",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_221345",
+    "sha256": "4fc43e8e5fc4f8ed299ce937926ebcf42afe71a9eee91cc35d9b4fa7d0de5b16"
+  },
+  {
+    "task_id": "50",
+    "domain": "retail",
+    "source_run": "train_distill_retail_20260806_235048",
+    "sha256": "0731bdb95ec777fe15bf137ea84967168eb094235a61acf88870a40fad919c59"
+  }
+]

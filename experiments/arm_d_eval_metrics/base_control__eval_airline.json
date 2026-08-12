@@ -1,0 +1,26 @@
+[
+  {
+    "run_id": "eval_airline_20260809_191820",
+    "seed": 2001,
+    "pass_rate": 0.4,
+    "cost_per_successful_task": 0.17850435,
+    "cost_per_task": 0.07140174,
+    "harness_error_count": 0
+  },
+  {
+    "run_id": "eval_airline_20260809_192553",
+    "seed": 2002,
+    "pass_rate": 0.2,
+    "cost_per_successful_task": 0.28556644999999997,
+    "cost_per_task": 0.05711329,
+    "harness_error_count": 0
+  },
+  {
+    "run_id": "eval_airline_20260809_193250",
+    "seed": 2003,
+    "pass_rate": 0.3,
+    "cost_per_successful_task": 0.26263026666666667,
+    "cost_per_task": 0.07878908,
+    "harness_error_count": 0
+  }
+]
