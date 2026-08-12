@@ -1,0 +1,26 @@
+[
+  {
+    "run_id": "eval_telecom_20260809_194049",
+    "seed": 2001,
+    "pass_rate": 0.64,
+    "cost_per_successful_task": 0.17693126874999998,
+    "cost_per_task": 0.11323601199999998,
+    "harness_error_count": 0
+  },
+  {
+    "run_id": "eval_telecom_20260809_202804",
+    "seed": 2002,
+    "pass_rate": 0.56,
+    "cost_per_successful_task": 0.20501911428571426,
+    "cost_per_task": 0.11481070399999999,
+    "harness_error_count": 0
+  },
+  {
+    "run_id": "eval_telecom_20260809_211309",
+    "seed": 2003,
+    "pass_rate": 0.56,
+    "cost_per_successful_task": 0.2136351714285714,
+    "cost_per_task": 0.119635696,
+    "harness_error_count": 0
+  }
+]

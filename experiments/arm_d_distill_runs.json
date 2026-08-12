@@ -1,0 +1,15 @@
+{
+  "runs": {
+    "train_distill_retail_20260806_215322": "retail",
+    "train_distill_retail_20260806_221345": "retail",
+    "train_distill_retail_20260806_235048": "retail",
+    "train_distill_airline_20260807_001049": "airline",
+    "train_distill_airline_20260807_002215": "airline",
+    "train_distill_airline_20260807_003519": "airline",
+    "train_distill_telecom_20260807_004643": "telecom",
+    "train_distill_telecom_20260807_014804": "telecom",
+    "train_distill_telecom_20260807_025738": "telecom"
+  },
+  "logs_root": "experiments/logs",
+  "agent_model": "anthropic/claude-opus-4-8"
+}

@@ -1,0 +1,26 @@
+[
+  {
+    "run_id": "transfer_banking_20260809_220200",
+    "seed": 2001,
+    "pass_rate": 0.0,
+    "cost_per_successful_task": null,
+    "cost_per_task": null,
+    "harness_error_count": 30
+  },
+  {
+    "run_id": "transfer_banking_20260809_220209",
+    "seed": 2002,
+    "pass_rate": 0.0,
+    "cost_per_successful_task": null,
+    "cost_per_task": null,
+    "harness_error_count": 30
+  },
+  {
+    "run_id": "transfer_banking_20260809_220212",
+    "seed": 2003,
+    "pass_rate": 0.0,
+    "cost_per_successful_task": null,
+    "cost_per_task": null,
+    "harness_error_count": 30
+  }
+]
