@@ -47,7 +47,7 @@ class _FakeFuture:
     def __init__(self, tokens):
         self._tokens = tokens
 
-    def result(self):
+    def result(self, timeout=None):
         return _FakeSampleResult(self._tokens)
 
 

@@ -1,35 +1,4 @@
-"""Arm D serving path B — a local, dependency-free OpenAI-compatible shim in
-front of Tinker's ``SamplingClient``.
 
-Why this exists: Arm D's tuned adapter (a LoRA fine-tune of
-``thinkingmachines/Inkling-Small``) can't be served serverless anywhere —
-Together and Fireworks both require an expensive *dedicated* GPU endpoint for
-a custom adapter. Tinker serves it CHEAPLY, per-token, no hourly commitment —
-but only via its own ``SamplingClient`` API, not an OpenAI-compatible HTTP
-endpoint. This module is that missing HTTP face: it terminates TAU2's
-existing eval seam (litellm's ``openai/`` provider + ``AGENT_API_BASE``,
-unchanged since Arm C) at ``POST /v1/chat/completions`` and translates each
-request into a Tinker ``sample()`` call via the ``tinker_cookbook`` renderer
-(prompt-build + tool-call parsing — no hand-rolled chat templating).
-
-One shim process serves BOTH systems under test identically (single
-variable = the presence of the LoRA adapter), routed purely by the request's
-``model`` field:
-
-    "armd-inkling-small-tuned"     -> tuned SamplingClient (model_path=...)
-    "thinkingmachines/Inkling-Small" -> naive base SamplingClient (base_model=...)
-
-``handle_chat`` is the pure, unit-testable core (sampler + renderer are
-injected — see tests/test_arm_d_serving_shim.py, which never imports the
-real ``tinker``/``tinker_cookbook`` packages and spends $0). ``SamplerCache``
-and ``main`` wire it to real Tinker objects and an
-``http.server.ThreadingHTTPServer`` for live use (concurrency matters: the
-eval parallelizes requests).
-
-Do NOT confuse this with ``arm_d/serving.py`` (the earlier, superseded
-Together-console export path — dedicated GPU endpoints only, never used for
-the real run; kept only as prior art / for its still-valid HF-export helper).
-"""
 from __future__ import annotations
 
 import argparse
@@ -62,6 +31,9 @@ DEFAULT_TUNED_PATH = (
 
 DEFAULT_MAX_TOKENS = 1024
 DEFAULT_TEMPERATURE = 0.0
+# Per-request sample() ceiling — a legit (even long banking) generation finishes
+# well under this; exceeding it means a stuck/dead connection, so fail-fast.
+SAMPLE_TIMEOUT_S = 240
 
 
 # --------------------------------------------------------------------------
@@ -146,6 +118,21 @@ def _to_cookbook_messages(messages: Sequence[dict]) -> List[dict]:
     return convo
 
 
+def _strip_think_content(oai_message: dict) -> None:
+    """Inkling is a reasoning model; parse_response leaves its chain-of-thought
+    in ``<think>...</think>`` inside the message content. Strip it in place so
+    the user-simulator sees only the reply. Applied identically to tuned + base,
+    so the tuned-vs-base delta is unaffected."""
+    import re
+
+    content = oai_message.get("content")
+    if not isinstance(content, str):
+        return
+    cleaned = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL)
+    cleaned = re.sub(r"<think>.*$", "", cleaned, flags=re.DOTALL)  # unclosed (truncated)
+    oai_message["content"] = cleaned.strip()
+
+
 def handle_chat(body: dict, *, sampler: Any, renderer: Any, model_id: str) -> dict:
     """Serve one ``/v1/chat/completions`` request against an already-resolved
     ``sampler``/``renderer`` pair. Pure aside from the injected ``sampler.sample``
@@ -167,11 +154,17 @@ def handle_chat(body: dict, *, sampler: Any, renderer: Any, model_id: str) -> di
         stop=renderer.get_stop_sequences(),
     )
 
-    response = sampler.sample(prompt, num_samples=1, sampling_params=sampling_params).result()
+    # Bound the wait: a dead/stuck Tinker connection otherwise blocks .result()
+    # forever and wedges the whole eval at one turn. On timeout this raises ->
+    # 500 -> run_train_eval's retry path (fail-fast, not hang).
+    response = sampler.sample(
+        prompt, num_samples=1, sampling_params=sampling_params
+    ).result(timeout=SAMPLE_TIMEOUT_S)
     tokens = list(response.sequences[0].tokens)
 
     message, _termination = renderer.parse_response(tokens)
     oai_message = renderer.to_openai_message(message)
+    _strip_think_content(oai_message)
 
     finish_reason = "tool_calls" if oai_message.get("tool_calls") else "stop"
     prompt_tokens = prompt.length
@@ -248,7 +241,10 @@ class SamplerCache:
             return cached
         client = self._client()
         if model_id == TUNED_MODEL_ID:
-            sampler = client.create_sampling_client(model_path=self._tuned_path)
+     
+            sampler = client.create_sampling_client(
+                base_model=self._base_model, model_path=self._tuned_path
+            )
         elif model_id == BASE_MODEL_ID:
             sampler = client.create_sampling_client(base_model=self._base_model)
         else:
