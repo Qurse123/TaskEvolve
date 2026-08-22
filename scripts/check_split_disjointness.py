@@ -34,6 +34,7 @@ MANIFEST = Path("experiments/arm_d_sft_manifest.json")
 DOMAIN_BY_SPLIT: Dict[str, str] = {
     "validation": "retail",
     "proxy": "retail",
+    "test_retail": "retail",
     "smoke": "mock",
     "eval_airline": "airline",
     "eval_telecom": "telecom",
