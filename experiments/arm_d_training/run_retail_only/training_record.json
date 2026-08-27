@@ -1,0 +1,18 @@
+{
+  "base_model": "thinkingmachines/Inkling-Small",
+  "lora_rank": 32,
+  "lr": 0.0001,
+  "max_epochs": 4,
+  "patience": 2,
+  "batch_size": 8,
+  "cost_per_step_usd": 0.0,
+  "steps": 32,
+  "best_holdout_loss": 4.598629429936409,
+  "training_cost_usd": 0.0,
+  "cost_note": "no billing telemetry exposed; fallback = steps * cost_per_step_usd (0.0)",
+  "checkpoint": "tinker://dca82fe5-f955-502e-8456-8211dd663407:train:0/sampler_weights/arm-d-inkling-small-lora-run_retail_only",
+  "checkpoint_name": "arm-d-inkling-small-lora-run_retail_only",
+  "num_train_examples": 58,
+  "num_holdout_examples": 12,
+  "timestamp": "2026-08-22T20:22:19.741592+00:00"
+}

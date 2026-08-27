@@ -35,6 +35,8 @@ DOMAIN_BY_SPLIT: Dict[str, str] = {
     "validation": "retail",
     "proxy": "retail",
     "test_retail": "retail",
+    "test_airline": "airline",
+    "test_telecom": "telecom",
     "smoke": "mock",
     "eval_airline": "airline",
     "eval_telecom": "telecom",
