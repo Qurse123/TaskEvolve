@@ -67,6 +67,28 @@ def generate_arm_d_splits(*, seed: int = 42) -> None:
     _write(banking[:BANKING_TRANSFER_SIZE], "transfer_banking")
 
 
+# Official TAU2 held-out `test` splits (disjoint from `train`), expected counts.
+TEST_DOMAINS = {"retail": 40, "airline": 20, "telecom": 40}
+
+
+def _test_ids(domain: str) -> list[str]:
+    mod = __import__(f"tau2.domains.{domain}.environment", fromlist=["get_tasks"])
+    return [t.id for t in mod.get_tasks(task_split_name="test")]
+
+
+def generate_test_splits() -> None:
+    """Generate the official TAU2 held-out `test` splits (frozen on write).
+
+    These are disjoint from `train` (hence from proxy/validation/train_distill),
+    so they are the true held-out evaluation set. Deterministic, $0 (task ids
+    only). Mirrors ``generate_arm_d_splits`` but reads ``task_split_name="test"``.
+    """
+    for domain, expected in TEST_DOMAINS.items():
+        ids = _test_ids(domain)
+        assert len(ids) == expected, f"{domain} test: {len(ids)} != {expected}"
+        _write(ids, f"test_{domain}")
+
+
 def arm_d_split_manifest() -> dict[str, list[str]]:
     names = [
         "train_distill_retail", "train_distill_airline", "train_distill_telecom",
