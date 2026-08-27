@@ -1,0 +1,9 @@
+{
+  "runs": {
+    "train_distill_retail_20260806_215322": "retail",
+    "train_distill_retail_20260806_221345": "retail",
+    "train_distill_retail_20260806_235048": "retail"
+  },
+  "logs_root": "experiments/logs",
+  "agent_model": "anthropic/claude-opus-4-8"
+}
