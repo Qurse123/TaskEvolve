@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -22,12 +23,19 @@ DEFAULT_PORT = 8100
 # it. Both are also the pricing keys registered in settings/pricing.py.
 TUNED_MODEL_ID = "armd-inkling-small-tuned"
 BASE_MODEL_ID = "thinkingmachines/Inkling-Small"
+# A3 ablation: a SECOND tuned adapter (retail-only distillation) served under its
+# own id so its eval rows don't collide with the all-domain tuned rows. Its
+# tinker:// path is only known after the A3 training run, so it's supplied at
+# launch via --retail-tuned-path / $ARM_D_RETAIL_TUNED_PATH (unset by default →
+# the id is simply not routable, keeping the default 2-id behavior unchanged).
+RETAIL_TUNED_MODEL_ID = "armd-inkling-small-retail-tuned"
 
 DEFAULT_BASE_MODEL = "thinkingmachines/Inkling-Small"
 DEFAULT_TUNED_PATH = (
     "tinker://fdc7bf81-d958-529c-9788-2332faf52c1d:train:0/sampler_weights/"
     "arm-d-inkling-small-lora-run_20260807_222817"
 )
+DEFAULT_RETAIL_TUNED_PATH = os.environ.get("ARM_D_RETAIL_TUNED_PATH") or None
 
 DEFAULT_MAX_TOKENS = 1024
 DEFAULT_TEMPERATURE = 0.0
@@ -213,11 +221,13 @@ class SamplerCache:
         self,
         *,
         tuned_path: str = DEFAULT_TUNED_PATH,
+        retail_tuned_path: Optional[str] = None,
         base_model: str = DEFAULT_BASE_MODEL,
         service_client_factory: Optional[Callable[[], Any]] = None,
         renderer_factory: Optional[Callable[[str], Any]] = None,
     ) -> None:
         self._tuned_path = tuned_path
+        self._retail_tuned_path = retail_tuned_path
         self._base_model = base_model
         self._service_client_factory = service_client_factory or tinker.ServiceClient
         self._renderer_factory = renderer_factory or _default_renderer_factory
@@ -241,16 +251,20 @@ class SamplerCache:
             return cached
         client = self._client()
         if model_id == TUNED_MODEL_ID:
-     
             sampler = client.create_sampling_client(
                 base_model=self._base_model, model_path=self._tuned_path
+            )
+        elif model_id == RETAIL_TUNED_MODEL_ID and self._retail_tuned_path:
+            sampler = client.create_sampling_client(
+                base_model=self._base_model, model_path=self._retail_tuned_path
             )
         elif model_id == BASE_MODEL_ID:
             sampler = client.create_sampling_client(base_model=self._base_model)
         else:
             raise KeyError(
-                f"unknown model id for routing: {model_id!r} "
-                f"(expected {TUNED_MODEL_ID!r} or {BASE_MODEL_ID!r})"
+                f"unknown model id for routing: {model_id!r} (expected "
+                f"{TUNED_MODEL_ID!r}, {BASE_MODEL_ID!r}, or "
+                f"{RETAIL_TUNED_MODEL_ID!r} with --retail-tuned-path set)"
             )
         self._samplers[model_id] = sampler
         return sampler
@@ -324,11 +338,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--tuned-path", default=DEFAULT_TUNED_PATH)
+    parser.add_argument("--retail-tuned-path", default=DEFAULT_RETAIL_TUNED_PATH,
+                        help="tinker:// path for the A3 retail-only adapter, served "
+                        f"under id {RETAIL_TUNED_MODEL_ID!r} (default $ARM_D_RETAIL_TUNED_PATH).")
     parser.add_argument("--base-model", default=DEFAULT_BASE_MODEL)
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    cache = SamplerCache(tuned_path=args.tuned_path, base_model=args.base_model)
+    cache = SamplerCache(tuned_path=args.tuned_path, base_model=args.base_model,
+                         retail_tuned_path=args.retail_tuned_path)
     handler_cls = make_handler(cache)
     server = ThreadingHTTPServer(("0.0.0.0", args.port), handler_cls)
 
