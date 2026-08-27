@@ -99,4 +99,5 @@ def register_pricing() -> None:
         register_tuned_inkling(tuned_model_id)
 
     register_inkling_small("armd-inkling-small-tuned")
+    register_inkling_small("armd-inkling-small-retail-tuned")  # A3 retail-only adapter
     register_inkling_small("thinkingmachines/Inkling-Small")
