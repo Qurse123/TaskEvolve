@@ -13,8 +13,11 @@ experiments/plots/
 experiments/results.csv
 experiments/*.db
 
-# Bulky per-run console logs (regenerable; verdicts live in experiments/iterations + results.csv)
+# Bulky per-run console logs (regenerable; verdicts live in experiments/iterations + results.csv).
+# Match subdirectories too (e.g. experiments/run_logs/) so they can't be re-committed.
 experiments/*.log
+experiments/**/*.log
+experiments/run_logs/
 
 # Iterator run artifacts (regenerable; committing them collides across experiment
 # branches — the recurring PR-conflict source). Provenance lives in branch history.
