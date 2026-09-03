@@ -1,175 +1,400 @@
-# TaskEvolve paper — section-by-section outline
+# Working Structure for the Paper
 
-Format modeled on Anthropic research posts (e.g. *"How Claude is accelerating
-protein design and analytical chemistry"*, Aug 2026). Their signature moves,
-which this outline preserves:
+## 1. Summary / Opening
 
-1. **Lead with the result, not the method** — the headline number and the hero
-   figure come before any methodology.
-2. **Results organized into thematic subsections**, each opening with its number:
-   a competitive win, a hard-case win, a generalization result, and an explicit
-   *failures* subsection.
-3. **Limitations / integrity get their own first-class section**, not footnotes.
-4. **Close with reproducibility** — links to code, data, splits, pre-registration.
+### 1.1 Thesis
 
-Every number below is pulled from `CLAUDE.md` / `experiments/results.csv` as of
-2026-08-19. All headline arm comparisons are the **validation (retail) split,
-N=5** unless marked; Arm D cross-domain is **N=3**.
+State the main result immediately.
 
----
+- Small specialized open-weight models can match or outperform a frontier closed model on these agentic customer-service tasks.
+- They do so at substantially lower cost per successful task.
+- However, optimizing an agent harness against a narrow proxy distribution can produce cost improvements that do not generalize.
 
-## Title + summary (no heading)
+### 1.2 Why this question matters
 
-- **Working title:** "How much does agent success cost? Measuring the
-  cost–performance frontier of LLM agents on TAU2-bench."
-- **Subtitle / one-liner:** A controlled measurement study across six
-  configurations — closed frontier models, a naive open-weight model, an
-  autonomously-optimized harness, and a fine-tuned open-weight model.
-- **Executive summary (one paragraph, headline-first):** On TAU2-bench retail, a
-  *naive* open-weight model (Inkling) reaches **0.874** task success at
-  **$0.022** per successful task — within 3pp of frontier Opus 4.8 (**0.903**)
-  at **~26× lower cost**. Targeted LoRA fine-tuning of a smaller open model
-  (Arm D) then extends the frontier into *untrained* domains (+13.3pp airline,
-  +10.7pp telecom) while getting cheaper. The study's method contribution: cost
-  and success are a **frontier, not a single score**, and we report **cost per
-  successful task** as the scalar that captures the tradeoff.
+Explain why existing benchmarks are insufficient.
 
-## Hero figure (immediately after summary)
+- Most benchmarks optimize/report task success.
+- Real deployments care about both capability and inference cost.
+- Therefore, the relevant quantity is the **cost-performance frontier**, not task success alone.
 
-- `experiments/plots/all_arms_frontier_20260811.png` — cost-vs-success scatter,
-  all six arms, validation/retail, arm mean ± std. This *is* the thesis in one
-  image. Caption must state: validation (retail) split, N=5 (Arm D N=3), x-axis
-  = average cost per task.
+### 1.3 Headline result
+
+Introduce **Figure 1 immediately**.
+
+Give only the most important numbers:
+
+- Retail
+- Airline
+- Telecom
+- Fine-tuned Inkling vs Opus
+- Iterator failure outside the optimization domain
+
+Do not deeply explain *why* yet.
 
 ---
 
-## 1. Why the cost axis is the real question (framing)
+## 2. Measuring the Cost-Performance Frontier
 
-- What TAU2-bench is: tool-heavy customer-service tasks, LLM user-sim, a frozen
-  Orchestrator that scores task success. Domains: retail, airline, telecom,
-  banking-knowledge.
-- The gap this fills: benchmark leaderboards report success only. Enterprises
-  pay per token. The decision-relevant quantity is **cost per successful task**,
-  and the answer is a **Pareto frontier** of (cost, success) points — not one
-  winner.
-- Define the headline metric plainly here so results read cleanly:
-  `cost_per_successful_task = total_cost / (num_tasks × pass_rate)`.
+**Question:** How should agentic systems be compared fairly?
 
-## 2. The setup (their "The campaign")
+This is your common experimental setup.
 
-- **The six arms**, one table, each a single controlled variable:
-  - Arm A — closed baseline, `gpt-4.1`, static v0.1 harness.
-  - Opus 4.8 — frontier closed reference, same static v0.1 harness.
-  - Arm B — iterator-optimized harness (v0.2); the optimizer autonomously swapped
-    the whole agent Opus→Sonnet 5.
-  - Arm C — naive open-weight Inkling (975B/41B MoE), static v0.1 harness.
-  - Arm D base — naive Inkling-Small (matched control).
-  - Arm D tuned — Inkling-Small + Opus-distilled LoRA, same static harness.
-- **Controls that make the axes clean:** frozen Orchestrator (never modified),
-  fixed user-sim model, identical seeds across arms, harness pinned at v0.1 for
-  the model axis so "model" and "harness" are separated levers.
-- **Statistical protocol:** every point is a distribution, N=5 fixed seeds
-  (proxy 1001–1005, validation 2001–2005), reported mean ± std. Significance for
-  Arm D deltas: |Δ| > σ_d = sqrt(σ_base² + σ_tuned²).
-- **What the agent has:** the harness (system prompt, policy, tool schemas),
-  routed through TAU2's `generate()`. No Orchestrator access.
+### 2.1 Benchmark
 
-## 3. Results
+- TAU2-bench
+- Retail, airline, telecom
+- Official held-out test splits
+- Number of tasks per domain
 
-Open with the headline, then thematic subsections.
+### 2.2 Metrics
 
-### 3.1 The model axis: open-weight nearly matches frontier at a fraction of cost
+Define:
 
-- Validation, all v0.1 harness: **Opus 0.903 @ $0.578/succ · Inkling 0.874 @
-  $0.022/succ · gpt-4.1 0.806 @ $0.062/succ.**
-- Takeaway: naive Inkling is the efficiency winner — higher success than
-  gpt-4.1 AND ~26× cheaper than Opus. gpt-4.1 is dominated.
-- Figure: `frontier_validation_3model_20260723.png`.
+- Task success rate
+- Cost
+- Cost per successful task
+- Why you use this metric
 
-### 3.2 An autonomous optimizer discovers a real tradeoff point (Arm B)
+### 2.3 Controlled comparison
 
-- The un-biased iterator, exploring five edit levers, **autonomously proposed
-  swapping Opus→Sonnet 5.** Blind validation N=5: **0.851 ± 0.051 @ $0.215/succ**
-  — proxy predicted 0.833 @ $0.219, so it **transferred with zero overfit.**
-- Frame honestly: this wins *within the closed-Anthropic axis*; Inkling still
-  owns the efficiency corner. A new frontier *point*, not a dominating one.
-- Figure: `frontier_validation_20260729_044810.png`, trajectory plot.
+Explain what stays fixed:
 
-### 3.3 Specialization extends the frontier into untrained domains (Arm D)
+- User simulator
+- Seeds 4001–4005
+- Task splits
+- Evaluation procedure
+- Agent harness, except where the harness itself is the experimental variable
+- Model/provider settings where applicable --> impetus of using inkiling 
 
-- Opus-distilled LoRA on Inkling-Small, evaluated base vs tuned per domain (N=3):
-  - retail: 0.848 → 0.838 (flat, cheaper)
-  - airline: 0.300 → **0.433 (+13.3pp, > σ)**
-  - telecom: 0.587 → **0.693 (+10.7pp, > σ)**
-  - banking (transfer, untrained): 0.100 → 0.100 (Δ=0, **no regression**)
-  - aggregate cost per successful task: **$0.452 → $0.191** (cheaper in all four)
-- Takeaway: fine-tuning bought cross-domain gains AND lower cost — a genuine
-  Pareto move, verified as a clean specialization win (not overfit).
-- Figure: `arm_d_c_vs_d_frontier_20260811.png`.
+This is the **apples-to-apples** section from your current outline.
 
-### 3.4 Where it failed (dedicated failures subsection)
+### 2.4 Avoiding test contamination / overfitting
 
-- **Arm B v0.2 proxy-overfit (the first run):** an accepted change (send system
-  prompt only on turn 1) cut cost on the 12-task proxy but regressed success
-  0.806→0.720 on blind validation — a cost-for-success trade the small proxy
-  couldn't detect. Reported as proxy-overfit per pre-committed criterion.
-- **Banking transfer floor:** both base and tuned sit at 0.100 — specialization
-  didn't transfer to a retrieval/knowledge domain it never trained on. Honest
-  ceiling on the generalization claim.
+Briefly establish the rules of the experiment:
 
-## 4. Methodology integrity (their "dual-use" analogue)
+- What data each system was allowed to see
+- Proxy/train vs held-out test separation
+- No optimization against held-out results
+- Any other controls you actually used
 
-This is the section that signals rigor — treat it as first-class.
-
-- **Blind validation as the overfitting guard:** the optimizer sees proxy only;
-  validation runs once, post-hoc, against a **pre-committed** pass criterion
-  (`experiments/*_precommit.md`). Cite this throughout.
-- **We found and corrected our own methodology flaw.** The original acceptance
-  rule was single-objective (accept iff cheaper AND ≥0.95×best success), which
-  *structurally rejects every cost-for-precision tradeoff* in what is really a
-  multi-objective frontier study. We reframed the objective to cost per
-  successful task with a low absolute success floor, and un-biased the optimizer
-  (model choice = one lever among five, not a hand-fed answer). Present this as a
-  strength: the frontier framing came from catching the flaw.
-- **Single-variable discipline:** why Opus was run only in v0.1 and not v0.2
-  (v0.2 was tuned for gpt-4.1 — Opus-in-v0.2 would confound model with harness).
-
-## 5. Conclusion
-
-- Synthesis: the frontier has a clear shape — open-weight models dominate the
-  efficiency corner; frontier closed models buy the top few points of success at
-  a steep premium; targeted fine-tuning shifts a small open model up-and-left,
-  including into untrained domains.
-- Honest scope caveats: proxy is 12 tasks / validation 35 (retail); cross-domain
-  Arm D is N=3; the official TAU2 hidden-test split was **deliberately deferred**
-  (not run), so all numbers are on our frozen train-derived splits.
-- Future direction: run the official hidden-test split once for headline
-  reporting; widen the frontier with more open-weight bases; test whether the
-  distillation gains hold at larger N.
-
-## Further reading / reproducibility
-
-- Repo + frozen splits (`benchmark/splits/*.json`), canonical `results.csv`.
-- Pre-registration docs: `experiments/validation_event_v0.2_precommit.md`,
-  `experiments/arm_d_eval_precommit.md`.
-- All frontier figures under `experiments/plots/`.
-- Design + spec: `systems_design.md`, `experiment.md`.
-
-## Footnotes (methodology granularity)
-
-- Exact seeds, N per arm, σ_d significance rule, pricing registration (how
-  open-weight cost is computed), the serving shim for the tuned adapter, and the
-  train/eval split-disjointness guarantee.
+Keep this general here. Put experiment-specific mitigations in their respective sections.
 
 ---
 
-### Open decisions to confirm before drafting prose
+## 3. Can Harness Optimization Move the Frontier?
 
-1. **Audience/venue** — Anthropic-style blog post (this format) vs a formal
-   paper (would add Related Work + formal Methods). This outline is the blog
-   shape; say the word if it should be arXiv-formal.
-2. **Headline framing** — lead with "open-weight nearly matches frontier at 26×
-   less" (§3.1) or with "how much does success cost?" (the metric). Currently
-   both are in the summary; pick one to lead the title.
-3. **Arm D N=3 vs N=5** — the cross-domain result is N=3; decide whether to
-   caveat prominently or top up to N=5 before publishing.
+This is **Experiment 1**.
+
+### 3.1 Motivation
+
+Ask the question explicitly:
+
+> Can we improve the cost-performance frontier without changing the underlying frontier model?
+
+### 3.2 Iterator design
+
+Explain:
+
+- What the autonomous iterator is
+- What information it receives
+- What it can change
+- What objective it optimizes
+- Why you used the 12-task retail proxy split
+
+### 3.3 Guardrails / potential failure modes
+
+Explain the relevant issues here:
+
+- Proxy overfitting
+- Search over a small task distribution
+- Why held-out airline and telecom are useful tests of generalization
+
+Do **not** put all overfitting discussion into a generic methods section. It matters specifically to this experiment.
+
+### 3.4 Results
+
+Show what happened.
+
+- Retail improvement / cost reduction
+- Airline: 0.330
+- Telecom: 0.210
+- Compare with baseline
+
+### 3.5 Interpretation
+
+This is the conclusion of the experiment:
+
+> The iterator successfully optimized its stated objective, but the resulting solution specialized to the proxy distribution rather than improving the general cost-performance frontier.
+
+That sets up Experiment 2.
+
+---
+
+## 4. Can Model Specialization Move the Frontier?
+
+This is **Experiment 2** and probably the central section of the paper.
+
+### 4.1 Motivation
+
+Bridge directly from the iterator result:
+
+> If optimizing the harness against a narrow proxy does not generalize, can specialization of the underlying model produce a more robust shift in the frontier?
+
+### 4.2 Base model
+
+Explain:
+
+- Inkling-Small
+- Why you chose it
+- Base-model performance/cost before specialization
+
+### 4.3 Fine-tuning methodology
+
+Explain:
+
+- Training data
+- How it was generated/constructed
+- Training objective
+- Fine-tuning method
+- Any relevant hyperparameters
+
+### 4.4 Preventing overfitting / leakage
+
+Put the fine-tuning-specific safeguards here:
+
+- Separation between training data and held-out test tasks
+- Validation strategy
+- Any domain balancing
+- Early stopping / checkpoint selection / whatever you actually did
+- Anything used to prevent learning benchmark-specific artifacts
+
+This corresponds to the fine-tuning and overfitting material already in your proposed outline.
+
+### 4.5 Results
+
+Now show:
+
+**Retail**
+
+- Fine-tuned Inkling: 0.875
+- Opus: 0.875
+- 15.5× lower cost per successful task
+
+**Airline**
+
+- Inkling: 0.750
+- Opus: 0.690
+- >13× lower cost
+
+**Telecom**
+
+- Inkling: 0.660
+- Opus: 0.545
+- >13× lower cost
+
+### 4.6 Interpretation
+
+Answer the question:
+
+> Unlike harness optimization against the retail proxy, model specialization produces improvements that persist across the held-out domains.
+
+Be careful about saying *why* unless your experiments establish causality.
+
+---
+
+## 5. What Moves the Frontier?
+
+Now synthesize the four arms.
+
+This should be the conceptual payoff rather than another giant results dump.
+
+Compare:
+
+**Opus 4.8 + static harness**
+
+→ expensive, strong general baseline
+
+**Inkling-Small base**
+
+→ cheaper, but weaker without specialization
+
+**Opus 4.8 + autonomous iterator**
+
+→ cost optimized on retail proxy, poor cross-domain generalization
+
+**Inkling-Small fine-tuned**
+
+→ low cost + strong held-out performance
+
+Then answer:
+
+### 5.1 Cost vs capability
+
+What happens when you simply use a cheaper model?
+
+### 5.2 Harness optimization vs model specialization
+
+What changes when you optimize the surrounding system versus changing the model itself?
+
+### 5.3 Generalization
+
+Which gains survive distribution/domain changes?
+
+### 5.4 The resulting frontier
+
+Return to your central concept:
+
+> Which systems are actually Pareto-efficient in cost and task success?
+
+This is where Figure 1 becomes more than a benchmark graph.
+
+---
+
+## 6. Implications
+
+Only **now** broaden from your experiments to the industry.
+
+### 6.1 Implications for enterprise agents
+
+For sufficiently narrow, high-volume workflows:
+
+- specialization may matter more than frontier-scale general capability
+- inference economics become increasingly important
+
+### 6.2 Implications for open-weight models
+
+Your defensible claim is not:
+
+> Open models will replace frontier models.
+
+It is closer to:
+
+> As open-weight models become sufficiently capable, domain specialization can make them economically preferable for some bounded production workloads.
+
+### 6.3 Implications for frontier labs
+
+This is where your larger thesis about frontier labs belongs:
+
+- frontier labs push general capability
+- application/FDE companies have domain-specific failure data
+- specialization can happen closer to the application layer
+- frontier models remain valuable where frontier capabilities are actually necessary
+
+Your existing draft already starts exploring this argument.
+
+---
+
+## 7. Limitations
+
+I would give this its own small section before the conclusion.
+
+Be explicit:
+
+- Only three TAU2 domains
+- One frontier model comparison
+- One small open-weight model / family
+- Particular fine-tuning recipe
+- Particular cost assumptions/providers
+- Small proxy split for iterator
+- Benchmark tasks are not equivalent to all production agent workloads
+- Results do not establish that specialized small models dominate frontier models generally
+
+This section actually makes the broader claims **more credible**, not weaker.
+
+---
+
+## 8. Conclusion
+
+Do not introduce new arguments.
+
+Bring it back to the question:
+
+> What should organizations optimize when choosing models for agentic workloads?
+
+Then summarize the two findings:
+
+**Finding 1:**
+
+Optimizing an agent system against a narrow proxy can improve its measured economics without producing a general improvement.
+
+**Finding 2:**
+
+Domain specialization of a small open-weight model can shift the cost-performance frontier substantially, matching or exceeding the tested frontier model at far lower cost on these held-out tasks.
+
+End with the larger implication:
+
+> The model with the highest general capability is not necessarily the model that produces the best production system.
+
+---
+
+## Paper Flow at a Glance
+
+**1. Summary + Figure 1**
+
+↓
+
+**2. How do we measure the frontier?**
+
+↓
+
+**3. Can harness optimization move it?**
+
+→ Method → safeguards → result → interpretation
+
+↓
+
+**4. Can model specialization move it?**
+
+→ Method → safeguards → result → interpretation
+
+↓
+
+**5. What moves the frontier?**
+
+→ Compare all four systems
+
+↓
+
+**6. Implications**
+
+↓
+
+**7. Limitations**
+
+↓
+
+**8. Conclusion**
+
+---
+
+# Appendix A. Verified numbers
+
+Validity-gated from `experiments/results.csv`. 9 of 129 ledger rows are crashed or superseded runs
+excluded per the pre-registered validity gate. Held-out test splits, N=5, seeds 4001 to 4005.
+
+| System | Retail, 40 tasks | Airline, 20 tasks | Telecom, 40 tasks |
+|---|---|---|---|
+| Opus 4.8, static harness | 0.875 ± 0.031 at $0.5109 | 0.690 ± 0.074 at $0.6741 | 0.545 ± 0.037 at $1.4051 |
+| Opus 4.8 plus agent iterator, v0.4 | 0.740 ± 0.060 at $0.0901 | 0.330 ± 0.057 at $0.1606 | 0.210 ± 0.052 at $0.2423 |
+| Inkling-Small base | 0.915 ± 0.038 at $0.0416 | 0.700 ± 0.100 at $0.0763 | 0.675 ± 0.043 at $0.1774 |
+| Inkling-Small fine-tuned | 0.875 ± 0.040 at $0.0329 | 0.750 ± 0.061 at $0.0414 | 0.660 ± 0.045 at $0.1028 |
+
+Cost figures are cost per successful task. Dev-split validation, retail, N=5: Opus 0.903 at $0.5785,
+iterator v0.4 0.732 at $0.0950.
+
+Iterator run: 6 iterations, 3 accepted, v0.1 climbing to v0.4, editor search cost $0.17. It routed
+the whole agent to Haiku 4.5 and dropped the system prompt after the first assistant turn.
+
+# Appendix B. Figure map
+
+| Figure | Content | Section | File |
+|---|---|---|---|
+| Figure 1 | Four systems, three held-out domains, every seed run shown | 1.3, revisited in 5.4 | `fig1_test_all_runs_four_systems` |
+| Figure 2 | Iterator trajectory across its 6 iterations | 3.4 | to build |
+| Figure 3 | Base versus fine-tuned by domain, cost and success panels | 4.5 | to build |
+
+Figure style follows the Anthropic research post convention: cream canvas, letterspaced figure
+eyebrow, bold headline title carrying the claim, muted palette with the comparator in warm gray,
+values printed on the marks, no in-image chart titles, captions below stating the finding then the
+conditions. No em dashes and no brackets anywhere in prose, labels or captions.
