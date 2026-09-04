@@ -43,11 +43,8 @@ The objective is to REDUCE COST PER SUCCESSFUL TASK (cost ÷ successful tasks) w
 keeping task success high. There is a low absolute success floor as an anti-gaming
 guardrail, but you are optimizing the cost/success ratio — not holding success
 fixed. Cost is driven by turns, tool calls, verbose context, and model choice — no
-lever is privileged. The agent's model is chosen from a fixed pool:
-anthropic/claude-opus-4-8 (strongest, $5/$25 per 1M), anthropic/claude-sonnet-5
-(mid, $2/$10), and anthropic/claude-haiku-4-5-20251001 (cheapest, $1/$5);
-model_routing.get_model selects the single model the WHOLE agent runs on (it does
-NOT route per turn or per keyword) — no other model exists here. Using the cost
+lever is privileged. model_routing.get_model selects the single model the WHOLE
+agent runs on; the harness does not route per turn or per keyword. Using the cost
 table and the transcripts above, analyze in 3-5 concise bullet points where cost is
 being wasted (redundant turns or tool calls, verbose context, an over-powered model
 for the task mix, avoidable failures) and which harness lever could cut it — system
