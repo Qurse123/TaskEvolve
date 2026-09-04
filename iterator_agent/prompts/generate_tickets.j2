@@ -53,20 +53,18 @@ was ACCEPTED:
 Cost is driven by turns, tool calls, verbose context, and model choice — no single
 lever is privileged, so weigh all five files by the evidence above and spread your
 hypotheses across them. model_routing.py is ONE lever among the five, not the default
-move: model_routing.get_model selects the single model the WHOLE agent runs on (it does
-NOT route per turn or per keyword), chosen from a fixed pool — anthropic/claude-opus-4-8
-(strongest, $5/$25 per 1M), anthropic/claude-sonnet-5 (mid, $2/$10), and
-anthropic/claude-haiku-4-5-20251001 (cheapest, $1/$5); no other model exists here. Treat
+move: model_routing.get_model selects the single model the WHOLE agent runs on, and
+the harness does not route per turn or per keyword. Treat
 a model swap as just one testable hypothesis, ranked on its merits like any other. Do
 NOT propose task-ID-specific hacks or anything that reads validation/test data.
 
 Respond with ONLY a JSON array (no prose, no markdown fences) of exactly {{ n }} tickets,
 ranked most-promising first, each of the form:
 [
-  {
-    "hypothesis": "<the testable claim, e.g. 'policy_summary is verbose; trimming it cuts input tokens'>",
-    "target_surface": "<one of the allowed paths above, verbatim>",
-    "rationale": "<why, tied to the cost table / transcripts above>",
-    "expected_effect": "<the expected cost effect, e.g. 'lower cost per successful task, success held above the floor'>"
-  }
+ {
+ "hypothesis": "<the testable claim, e.g. 'policy_summary is verbose; trimming it cuts input tokens'>",
+ "target_surface": "<one of the allowed paths above, verbatim>",
+ "rationale": "<why, tied to the cost table / transcripts above>",
+ "expected_effect": "<the expected cost effect, e.g. 'lower cost per successful task, success held above the floor'>"
+ }
 ]
