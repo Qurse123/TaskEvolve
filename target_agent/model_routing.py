@@ -1,8 +1,6 @@
 """Model selection for TaskEvolveAgent.
 
-The iterator (Milestone 2+) may modify this file to add:
-- Cheap/strong routing based on turn count or confidence
-- Per-task-type model selection
+Selects the model used for each generation call.
 """
 
 from __future__ import annotations
