@@ -11,7 +11,7 @@ surface the way the real agent uses it, at $0 (no LLM, no benchmark):
      returns tau2 Message instances; call ``filter_tools``.
   3. Import ``target_agent.model_routing``; ``get_model`` must return an
      allowed agent model (the editor's contract: a single model from the
-     Anthropic pool — Opus 4.8 / Sonnet 5 / Haiku 4.5).
+     model this study can serve and price).
   4. Render the prompt templates exactly as ``target_agent.agent`` does
      (StrictUndefined), so an undefined variable or Jinja error fails here.
 
@@ -25,15 +25,31 @@ import json
 import sys
 from pathlib import Path
 
-# The agent may run on exactly one of these models (see prompts/*.j2). model_routing
-# picks a single model for the WHOLE agent (no per-turn/keyword routing).
-# Exp 2 Anthropic pool: Opus 4.8 ($5/$25 per 1M, strongest), Sonnet 5 ($2/$10, mid),
-# Haiku 4.5 ($1/$5, cheapest/fastest).
-ALLOWED_AGENT_MODELS = (
-    "anthropic/claude-opus-4-8",
-    "anthropic/claude-sonnet-5",
-    "anthropic/claude-haiku-4-5-20251001",
-)
+# model_routing picks a single model for the WHOLE agent (no per-turn/keyword
+# routing). We do not enumerate a pool here: doing so would hand the editor a menu
+# of candidates and turn a discovered cost lever into a prompted one. Instead we
+# check only that whatever it returns is an Anthropic Claude model LiteLLM can
+# price, which is what "servable and billable" actually means for this study.
+MODEL_PREFIXES = ("anthropic/claude", "claude")
+
+
+def _is_servable_model(model: object, configured: str) -> bool:
+    """True when *model* is a model this study can actually serve and bill.
+
+    Identity routing always passes: every arm sets its own AGENT_MODEL, and the
+    open-weight arms are not Anthropic. A deliberate swap away from the configured
+    model must land on an Anthropic Claude id LiteLLM holds a price for.
+    """
+    if not isinstance(model, str) or not model.strip():
+        return False
+    if model == configured:
+        return True
+    if not model.startswith(MODEL_PREFIXES):
+        return False
+    import litellm
+
+    bare = model.split("/", 1)[1] if "/" in model else model
+    return bool(litellm.model_cost.get(model) or litellm.model_cost.get(bare))
 
 PYTHON_SURFACES = (
     "target_agent/harness.py",
@@ -130,10 +146,12 @@ def _check_model_routing() -> None:
 
     if not callable(getattr(routing, "get_model", None)):
         raise RuntimeError("target_agent/model_routing.py must define get_model()")
-    configured = ALLOWED_AGENT_MODELS[0]
+    from settings import config
+
+    configured = config.AGENT_MODEL
     # Exercise the exact call agent.py makes — get_model(configured, history) —
     # with both an empty and a realistic multi-turn history, so any code path that
-    # returns an off-pool model (on any input) is caught at $0.
+    # returns an unservable model (on any input) is caught at $0.
     for history in ([], _synthetic_history()):
         try:
             model = routing.get_model(configured, history)
@@ -141,10 +159,10 @@ def _check_model_routing() -> None:
             raise RuntimeError(
                 f"model_routing get_model crashed: {type(exc).__name__}: {exc}"
             ) from exc
-        if model not in ALLOWED_AGENT_MODELS:
+        if not _is_servable_model(model, configured):
             raise RuntimeError(
-                f"model_routing returned disallowed model {model!r}; "
-                f"allowed: {', '.join(ALLOWED_AGENT_MODELS)}"
+                f"model_routing returned {model!r}, which this study cannot serve "
+                "and price; a swap must target an Anthropic Claude model"
             )
 
 

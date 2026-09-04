@@ -439,42 +439,88 @@ def _bump_version(version: str) -> str:
     return f"v{major}.{minor + 1}"
 
 
-def _default_eval_seed(split: str) -> EvalSeedFn:
-    """Default eval: one proxy repeat at the seed, in a FRESH interpreter.
+def _split_size(split: str) -> int:
+    """Task count for a split manifest, used to weight multi-domain aggregation."""
+    data = json.loads(
+        (Path("benchmark/splits") / f"{split}.json").read_text(encoding="utf-8")
+    )
+    ids = data if isinstance(data, list) else data.get("task_ids", data)
+    return len(ids)
 
-    The candidate edit may touch Python surfaces (``harness.py``,
-    ``model_routing.py``); an in-process eval would silently run the stale,
-    already-imported modules instead of the candidate (AutoPK's one-shot
-    dispatcher runs every hop as its own process for the same reason). The
-    subprocess imports the edited tree fresh and carries the candidate
-    ``HARNESS_VERSION`` via the environment so its ``results.csv`` rows
-    attribute to the candidate. Metrics come back through ``--metrics-json``.
+
+def _aggregate(parts: Sequence[Tuple[RunMetrics, int]]) -> RunMetrics:
+    """Fold per-domain results into one sample, weighted by task count.
+
+    Success is total passed over total tasks, so a domain contributes in
+    proportion to its size instead of every domain counting equally. Cost is
+    reconstructed as cost_per_task * tasks, because the per-repeat payload
+    carries ratios rather than totals. Harness errors sum: a crash anywhere
+    invalidates the whole sample, exactly as it does for a single split.
     """
+    total_tasks = sum(n for _, n in parts)
+    total_passed = sum(m.pass_rate * n for m, n in parts)
+    costed = [(m, n) for m, n in parts if m.cost_per_task is not None]
+    total_cost = sum(m.cost_per_task * n for m, n in costed)
+    return RunMetrics(
+        pass_rate=total_passed / total_tasks,
+        cost_per_successful_task=(
+            total_cost / total_passed if costed and total_passed else None
+        ),
+        cost_per_task=(total_cost / total_tasks) if costed else None,
+        harness_error_count=sum(m.harness_error_count for m, _ in parts),
+    )
+
+
+def _default_eval_seed(targets) -> EvalSeedFn:
+    """Default eval: one repeat per target at the seed, in FRESH interpreters.
+
+    ``targets`` is a single split name, or a sequence of (split, domain) pairs.
+    Multiple targets exist because TAU2 evaluates one domain per invocation, so
+    covering retail, airline and telecom means three subprocesses whose results
+    fold into a single sample via ``_aggregate``. Optimizing against one domain
+    lets a candidate look good on evidence that does not represent deployment.
+
+    A fresh interpreter per run matters: the candidate edit may touch
+    ``harness.py`` or ``model_routing.py``, and an in-process eval would silently
+    run the stale, already-imported modules instead of the candidate. The
+    subprocess also carries the candidate ``HARNESS_VERSION`` so its
+    ``results.csv`` rows attribute to the candidate.
+    """
+    pairs = [(targets, None)] if isinstance(targets, str) else list(targets)
 
     def eval_fn(seed: int) -> RunMetrics:
-        with tempfile.TemporaryDirectory() as tmp:
-            metrics_path = Path(tmp) / "metrics.json"
-            proc = subprocess.run(
-                [
+        parts = []
+        for split, domain in pairs:
+            with tempfile.TemporaryDirectory() as tmp:
+                metrics_path = Path(tmp) / "metrics.json"
+                cmd = [
                     sys.executable, "-m", "scripts.run_train_eval",
                     "--split", split,
                     "--seed-start", str(seed),
                     "--repeats", "1",
                     "--metrics-json", str(metrics_path),
-                ],
-                env={**os.environ, "HARNESS_VERSION": config.HARNESS_VERSION},
-            )
-            if proc.returncode != 0 or not metrics_path.exists():
-                raise RuntimeError(
-                    f"proxy eval subprocess failed (exit {proc.returncode}) "
-                    f"for split={split} seed={seed}"
+                ]
+                if domain:
+                    cmd += ["--domain", domain]
+                proc = subprocess.run(
+                    cmd,
+                    env={**os.environ, "HARNESS_VERSION": config.HARNESS_VERSION},
                 )
-            row = json.loads(metrics_path.read_text(encoding="utf-8"))[0]
-        return RunMetrics(
-            pass_rate=float(row["pass_rate"]),
-            cost_per_successful_task=row["cost_per_successful_task"],
-            cost_per_task=row["cost_per_task"],
-            harness_error_count=int(row.get("harness_error_count", 0)),
-        )
+                if proc.returncode != 0 or not metrics_path.exists():
+                    raise RuntimeError(
+                        f"eval subprocess failed (exit {proc.returncode}) "
+                        f"for split={split} seed={seed}"
+                    )
+                row = json.loads(metrics_path.read_text(encoding="utf-8"))[0]
+            parts.append((
+                RunMetrics(
+                    pass_rate=float(row["pass_rate"]),
+                    cost_per_successful_task=row["cost_per_successful_task"],
+                    cost_per_task=row["cost_per_task"],
+                    harness_error_count=int(row.get("harness_error_count", 0)),
+                ),
+                _split_size(split),
+            ))
+        return parts[0][0] if len(parts) == 1 else _aggregate(parts)
 
     return eval_fn
