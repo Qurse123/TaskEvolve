@@ -290,7 +290,7 @@ def test_cost_tracking_completion_treats_missing_cost_as_zero():
 
 
 def test_litellm_raw_drops_unsupported_params(monkeypatch):
-    # The editor model is configurable (e.g. o3, which rejects `temperature`);
+    # The editor model is configurable, and some models reject `temperature`;
     # drop_params lets LiteLLM strip whatever the chosen model does not support.
     from iterator_agent import researcher as r
     from settings import config
@@ -302,9 +302,9 @@ def test_litellm_raw_drops_unsupported_params(monkeypatch):
         return object()
 
     monkeypatch.setattr(r.litellm, "completion", fake_completion)
-    monkeypatch.setattr(config, "ITERATOR_MODEL", "o3")
+    monkeypatch.setattr(config, "ITERATOR_MODEL", "anthropic/claude-opus-4-8")
 
     r._litellm_raw("hello")
 
-    assert captured["model"] == "o3"
+    assert captured["model"] == "anthropic/claude-opus-4-8"
     assert captured["drop_params"] is True
