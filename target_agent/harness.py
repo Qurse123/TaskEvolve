@@ -1,8 +1,6 @@
 """Context-building helpers for TaskEvolveAgent.
 
-The iterator (Milestone 2+) may modify this file to add:
-- History compression when context grows large
-- Tool list filtering / description rewriting
+Assembles the message list and the tool list handed to the model on each turn.
 """
 
 from __future__ import annotations

@@ -14,15 +14,8 @@ floor guards against gaming). The five files are equally valid targets — choos
 lever the evidence best supports; do not default to any one of them. Keep the change
 focused enough to attribute its effect.
 
-Model constraint: switching the model is only ONE of several possible edits — weigh
-it against system-prompt, policy-summary, few-shot, history-handling, and
-tool-filtering changes rather than treating it as the go-to move. If you edit
-model_routing.py, get_model must return a single model that the WHOLE agent will use
-(it does NOT route per turn or per keyword). The only valid model names are
-"anthropic/claude-opus-4-8" (strongest, $5/$25 per 1M tokens),
-"anthropic/claude-sonnet-5" (mid, $2/$10), and
-"anthropic/claude-haiku-4-5-20251001" (cheapest/fastest, $1/$5). NEVER reference any
-other model.
+If you edit model_routing.py, get_model must return a single model that the WHOLE
+agent will use; the harness does not route per turn or per keyword.
 
 Respond with ONLY a JSON object (no prose, no markdown fences) of the form:
 {

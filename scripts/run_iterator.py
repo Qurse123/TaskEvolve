@@ -33,6 +33,7 @@ from iterator_agent.iteration_log import (
 )
 from iterator_agent.researcher import CompletionFn, CostTrackingCompletion
 from iterator_agent.run_iteration import (
+    _default_eval_seed,
     EvalSeedFn,
     IterationResult,
     PreflightFn,
@@ -286,6 +287,17 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Optional wall-clock budget (minutes); stops once elapsed time reaches it. "
         "--max-iterations still applies as a reproducible ceiling.",
     )
+    parser.add_argument(
+        "--eval-targets",
+        default=None,
+        help=(
+            "Comma-separated split:domain pairs to evaluate each candidate on, "
+            "e.g. 'proxy:retail,eval_airline:airline,eval_telecom:telecom'. TAU2 "
+            "runs one domain per invocation, so each pair becomes its own "
+            "subprocess and the results fold into one weighted sample. Omit to "
+            "evaluate on --split alone."
+        ),
+    )
     args = parser.parse_args(argv)
 
     if args.max_iterations < 1:
@@ -293,12 +305,23 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args.max_minutes is not None and args.max_minutes <= 0:
         parser.error("--max-minutes must be > 0")
 
+    eval_seed = None
+    if args.eval_targets:
+        pairs = []
+        for chunk in args.eval_targets.split(","):
+            split, _, domain = chunk.strip().partition(":")
+            if not split:
+                parser.error(f"malformed --eval-targets entry: {chunk!r}")
+            pairs.append((split, domain or None))
+        eval_seed = _default_eval_seed(pairs)
+
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     run_iterator(
         max_iterations=args.max_iterations,
         seed_start=args.seed_start,
         max_search_cost_usd=args.max_search_cost_usd,
         max_minutes=args.max_minutes,
+        eval_seed=eval_seed,
     )
     return 0
 
