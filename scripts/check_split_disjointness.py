@@ -51,6 +51,12 @@ TRAIN_SPLITS = ["train_distill_retail", "train_distill_airline",
                 "train_distill_telecom"]
 EVAL_SPLITS = ["validation", "eval_airline", "eval_telecom",
                "transfer_banking"]
+# Arm B's harness-search splits. They deliberately overlap the Arm D training
+# pool (every non-test task is allocated), so they are not part of the
+# train-vs-eval audit. Their own invariant is disjointness from the held-out
+# test splits, which is what makes Figure 1 valid for Arm B.
+SEARCH_SPLITS = ["search_retail", "search_airline", "search_telecom"]
+HELD_OUT_SPLITS = ["test_retail", "test_airline", "test_telecom"]
 
 Key = Tuple[str, str]  # (domain, task_id)
 
@@ -59,8 +65,9 @@ def domain_for(split_name: str) -> str:
     """Domain for a split file stem (train_distill_<d> derives its suffix)."""
     if split_name in DOMAIN_BY_SPLIT:
         return DOMAIN_BY_SPLIT[split_name]
-    if split_name.startswith("train_distill_"):
-        return split_name[len("train_distill_"):]
+    for prefix in ("train_distill_", "search_", "test_"):
+        if split_name.startswith(prefix):
+            return split_name[len(prefix):]
     raise KeyError(f"unknown split '{split_name}' -- add it to DOMAIN_BY_SPLIT")
 
 
