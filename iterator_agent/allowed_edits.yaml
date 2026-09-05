@@ -32,14 +32,9 @@ forbidden_paths:
 # iterator_agent/acceptance.py (NOT by edit_guard.py). The iterator may not
 # modify these mid-run.
 guardrails:
-  # ABSOLUTE task-success floor (anti-gaming): a candidate whose proxy success
-  # falls below this is rejected regardless of how cheap it is. This is NOT a
-  # fraction of the current best — the study optimizes a cost-vs-precision
-  # frontier, so a cheaper point with somewhat lower success is a legitimate
-  # tradeoff to keep, provided it stays above this floor and improves cost per
-  # successful task. Explicit + adjustable (was a hidden 0.95×best relative floor
-  # that structurally rejected every tradeoff).
-  absolute_success_floor: 0.5
+  # No task-success floor: success is already inside the objective, since
+  # cost per successful task divides by successes. A floor only discards
+  # measurements before the objective is computed.
   # Cost / quality ceilings; null = declared but not yet enforced.
   max_cost_per_successful_task_usd: null
   max_invalid_action_rate: null

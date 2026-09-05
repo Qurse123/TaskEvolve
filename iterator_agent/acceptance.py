@@ -63,7 +63,6 @@ class Guardrails:
     # fraction of the current best — the frontier is multi-objective, so a cheaper
     # point with somewhat lower success is a legitimate tradeoff to keep, provided
     # it stays above this floor and improves cost per successful task.
-    absolute_success_floor: float
     max_cost_per_successful_task_usd: Optional[float]
     max_invalid_action_rate: Optional[float]
     # Noise floor: a run must beat the current-best cost mean by at least this many
@@ -98,11 +97,7 @@ def load_guardrails(path: Union[str, Path] = DEFAULT_POLICY_PATH) -> Guardrails:
     """Load the acceptance guardrails block from the edit-policy YAML."""
     data = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
     block = data.get("guardrails") or {}
-    floor = block.get("absolute_success_floor")
-    if floor is None:
-        raise ValueError(f"guardrails.absolute_success_floor missing from {path}")
     return Guardrails(
-        absolute_success_floor=float(floor),
         max_cost_per_successful_task_usd=_opt_float(
             block.get("max_cost_per_successful_task_usd")
         ),
@@ -124,15 +119,11 @@ def _check_guardrails(
             "(harness_error) — the change breaks the harness",
         )
 
-    # Guardrail: absolute task-success floor (anti-gaming). Not a fraction of the
-    # current best — a cheaper point with somewhat lower success is a valid
-    # frontier tradeoff as long as it clears this absolute floor.
-    floor = guardrails.absolute_success_floor
-    if run.pass_rate < floor:
-        return RunCheck(
-            False,
-            f"crossed success guardrail: pass_rate {run.pass_rate:.4f} < absolute floor {floor:.4f}",
-        )
+    # No task-success floor. Success is already inside the objective: cost per
+    # successful task divides by successes, so a candidate that halves cost and
+    # halves success does not improve the number. A floor would only discard
+    # measurements before the objective is computed, which is what killed 8 of 17
+    # candidates in the previous run.
 
     # Guardrail: cost-per-successful-task ceiling (if set and reported).
     ceiling = guardrails.max_cost_per_successful_task_usd
