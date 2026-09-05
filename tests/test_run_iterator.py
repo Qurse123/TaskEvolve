@@ -42,7 +42,6 @@ def _best() -> Distribution:
 
 def _guardrails() -> Guardrails:
     return Guardrails(
-        absolute_success_floor=0.55,
         max_cost_per_successful_task_usd=None,
         max_invalid_action_rate=None,
     )
@@ -109,7 +108,9 @@ class _CostingComplete:
 
 def _eval_seq(costs, pass_rate: float = 0.667):
     """Eval stub yielding the given costs in order; records the seeds it saw."""
-    seq = list(costs)
+    # Two seeds per candidate now (no short-circuit), so each cost is served
+    # twice: one value per iteration becomes one value per seed.
+    seq = [c for c in costs for _ in range(2)]
     seen = []
 
     def eval_fn(seed: int) -> RunMetrics:
@@ -202,36 +203,9 @@ def test_stops_at_max_iterations(tmp_path: Path) -> None:
     assert len(results) == 3
     assert all(not r.accepted for r in results)
     assert results[-1].harness_version == "v0.1"
-    assert seen == [1001, 1005, 1009]
+    assert seen == [1001, 1002, 1005, 1006, 1009, 1010]
 
 
-def test_accept_updates_current_best_for_next_iteration(tmp_path: Path) -> None:
-    # Arrange: iter 1 beats 0.083, iter 2 must then beat the new best (0.07).
-    eval_fn, seen = _eval_seq([0.07, 0.07, 0.06, 0.06])
-
-    # Act
-    results = _run_iterator(tmp_path, complete=_fake_complete(), eval_fn=eval_fn, max_iterations=2)
-
-    # Assert
-    assert [r.accepted for r in results] == [True, True]
-    assert results[0].harness_version == "v0.2"
-    assert results[1].harness_version == "v0.3"
-    # Iteration 2 was compared against iteration 1's accepted distribution, not Arm A.
-    assert results[1].record.cost_per_successful_task_before == pytest.approx(0.07)
-    assert seen == [1001, 1002, 1005, 1006]
-
-
-def test_reject_keeps_previous_best(tmp_path: Path) -> None:
-    # Arrange: iter 1 accepts (0.07), iter 2 fails to beat 0.07, iter 3 must still beat 0.07.
-    eval_fn, _ = _eval_seq([0.07, 0.07, 0.09, 0.065, 0.065])
-
-    # Act
-    results = _run_iterator(tmp_path, complete=_varying_complete(), eval_fn=eval_fn, max_iterations=3)
-
-    # Assert: accept, reject, accept; the rejected iter did not move the baseline.
-    assert [r.accepted for r in results] == [True, False, True]
-    assert results[2].record.cost_per_successful_task_before == pytest.approx(0.07)
-    assert results[2].harness_version == "v0.3"
 
 
 def test_search_cost_budget_stops_loop_early(tmp_path: Path) -> None:
@@ -324,7 +298,7 @@ def test_duplicate_rejected_proposal_not_re_evaluated(tmp_path: Path) -> None:
     )
 
     assert len(results) == 2
-    assert seen == [1001]  # iteration 2 never reached the eval
+    assert seen == [1001, 1002]  # iteration 2 never reached the eval
     assert "duplicate" in results[1].decision.reason.lower()
 
 
@@ -342,3 +316,21 @@ def test_preflight_failure_spends_no_eval(tmp_path: Path) -> None:
     assert seen == []
     assert results[0].accepted is False
     assert "preflight" in results[0].decision.reason.lower()
+
+
+def test_baseline_is_never_promoted_between_iterations(tmp_path: Path) -> None:
+    """Every candidate is judged against the same unmodified-harness baseline.
+
+    Greedy promotion made each later candidate a measurement of a different
+    system, so the rows could not be compared against each other. The winner is
+    picked from the full table after the run instead.
+    """
+    # Costs that would previously have been accepted and promoted.
+    eval_fn, _ = _eval_seq([0.05, 0.05, 0.05])
+
+    results = _run_iterator(
+        tmp_path, complete=_varying_complete(), eval_fn=eval_fn, max_iterations=3
+    )
+
+    assert len(results) == 3
+    assert all(r.harness_version == "v0.1" for r in results)

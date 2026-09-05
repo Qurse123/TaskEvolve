@@ -36,7 +36,6 @@ BEST = Distribution(
 
 # absolute success floor 0.55; no cost/invalid ceilings.
 GUARDRAILS = Guardrails(
-    absolute_success_floor=0.55,
     max_cost_per_successful_task_usd=None,
     max_invalid_action_rate=None,
 )
@@ -45,7 +44,6 @@ GUARDRAILS = Guardrails(
 def test_load_guardrails_reads_real_yaml():
     g = load_guardrails()
 
-    assert g.absolute_success_floor == 0.5
     assert g.max_cost_per_successful_task_usd is None
     assert g.max_invalid_action_rate is None
     assert g.accept_margin_sigma == 1.0
@@ -54,7 +52,6 @@ def test_load_guardrails_reads_real_yaml():
 def test_margin_rejects_improvement_within_one_sigma_of_noise():
     # best mean 0.09, std 0.01 -> with a 1σ margin the threshold is 0.08.
     guardrails = Guardrails(
-        absolute_success_floor=0.55,
         max_cost_per_successful_task_usd=None,
         max_invalid_action_rate=None,
         accept_margin_sigma=1.0,
@@ -71,7 +68,6 @@ def test_margin_rejects_improvement_within_one_sigma_of_noise():
 def test_zero_margin_keeps_legacy_below_mean_rule():
     # Default margin 0.0 accepts anything strictly below the mean (legacy behavior).
     legacy = Guardrails(
-        absolute_success_floor=0.55,
         max_cost_per_successful_task_usd=None,
         max_invalid_action_rate=None,
     )
@@ -87,13 +83,21 @@ def test_run_that_lowers_cost_and_holds_success_passes():
     assert check.passed is True
 
 
-def test_run_below_success_floor_fails():
-    run = RunMetrics(pass_rate=0.5, cost_per_successful_task=0.08, cost_per_task=0.08)  # 0.5 < 0.55 floor
+def test_low_success_is_judged_on_cost_not_rejected_outright():
+    """Success has no floor: it is judged through cost per successful task.
 
-    check = check_run(run, BEST, GUARDRAILS)
+    A candidate that drops success but cuts cost enough to still improve the
+    objective is a legitimate frontier point and must survive. A candidate whose
+    success drop makes the objective worse fails on the objective, not on a
+    guardrail.
+    """
+    cheap_enough = RunMetrics(pass_rate=0.30, cost_per_successful_task=0.070)
+    assert check_run(cheap_enough, BEST, GUARDRAILS).passed is True
 
+    not_cheap_enough = RunMetrics(pass_rate=0.30, cost_per_successful_task=0.200)
+    check = check_run(not_cheap_enough, BEST, GUARDRAILS)
     assert check.passed is False
-    assert "success" in check.reason.lower()
+    assert "cost" in check.reason.lower()
 
 
 def test_run_without_cost_improvement_fails():
@@ -110,7 +114,6 @@ def test_cost_ceiling_guardrail_blocks_even_when_improved():
         pass_rate=0.6, cost_per_successful_task=0.088
     )  # < 0.09 best, > 0.085 ceiling
     guardrails = Guardrails(
-        absolute_success_floor=0.55,
         max_cost_per_successful_task_usd=0.085,
         max_invalid_action_rate=None,
     )
@@ -135,7 +138,7 @@ def test_both_runs_passing_accepts():
 def test_one_failing_run_rejects():
     runs = [
         RunMetrics(pass_rate=0.60, cost_per_successful_task=0.080, cost_per_task=0.080),
-        RunMetrics(pass_rate=0.50, cost_per_successful_task=0.082, cost_per_task=0.082),  # below floor
+        RunMetrics(pass_rate=0.50, cost_per_successful_task=0.120, cost_per_task=0.120),  # worse than best
     ]
 
     decision = evaluate_candidate(runs, BEST, GUARDRAILS)
@@ -189,7 +192,6 @@ def test_run_without_harness_errors_unaffected_by_new_field():
 # cost across runs below the same mu - k*sigma threshold. Same bar, more power.
 
 MARGIN_GUARDRAILS = Guardrails(
-    absolute_success_floor=0.55,
     max_cost_per_successful_task_usd=None,
     max_invalid_action_rate=None,
     accept_margin_sigma=1.0,  # threshold = 0.09 - 0.01 = 0.08
@@ -208,7 +210,9 @@ def test_near_miss_is_true_between_threshold_and_mean():
     assert near_miss(_run_at(0.085), BEST, MARGIN_GUARDRAILS) is True   # < mean, >= threshold
     assert near_miss(_run_at(0.075), BEST, MARGIN_GUARDRAILS) is True   # beats threshold too
     assert near_miss(_run_at(0.095), BEST, MARGIN_GUARDRAILS) is False  # above best mean
-    assert near_miss(_run_at(0.085, pass_rate=0.40), BEST, MARGIN_GUARDRAILS) is False  # floor
+    # Low success no longer disqualifies on its own: it shows up in the objective,
+    # since cost per successful task divides by successes.
+    assert near_miss(_run_at(0.085, pass_rate=0.40), BEST, MARGIN_GUARDRAILS) is True
 
 
 def test_three_run_mean_below_threshold_accepts():

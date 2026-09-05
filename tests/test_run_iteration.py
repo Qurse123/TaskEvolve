@@ -52,7 +52,6 @@ def _best(cost: float = 0.083, pass_rate: float = 0.583) -> Distribution:
 
 def _guardrails() -> Guardrails:
     return Guardrails(
-        absolute_success_floor=0.55,
         max_cost_per_successful_task_usd=None,
         max_invalid_action_rate=None,
     )
@@ -87,7 +86,9 @@ def _eval_counter(*results: RunMetrics):
     def eval_fn(seed: int) -> RunMetrics:
         idx = calls["n"]
         calls["n"] += 1
-        return results[idx]
+        # Both seeds always run now, so repeat the last supplied result when a
+        # test only cares about the first one.
+        return results[min(idx, len(results) - 1)]
 
     return eval_fn, calls
 
@@ -142,8 +143,8 @@ def test_accepts_when_both_runs_improve(tmp_path: Path) -> None:
     # Assert
     assert result.accepted is True
     assert calls["n"] == 2  # both seeds run
-    assert result.harness_version == "v0.2"  # bumped
-    assert (tmp_path / ALLOWED_TARGET).read_text() == "IMPROVED PROMPT\n"  # kept
+    assert result.harness_version == "v0.1"  # always reverted; nothing is kept  # bumped
+    assert (tmp_path / ALLOWED_TARGET).read_text() == ORIGINAL_CONTENT  # always reverted
     assert (tmp_path / "experiments" / "accepted_changes.md").exists()
 
 
@@ -160,7 +161,7 @@ def test_accept_writes_iteration_record(tmp_path: Path) -> None:
 
     # Assert
     assert record["iteration_id"] == "iter_0001"
-    assert record["harness_version"] == "v0.2"
+    assert record["harness_version"] == "v0.1"
     assert record["changed_file"] == ALLOWED_TARGET
     assert record["proxy_seeds"] == [1001, 1002]
     assert record["accepted_or_rejected"] == "accepted"
@@ -168,7 +169,8 @@ def test_accept_writes_iteration_record(tmp_path: Path) -> None:
 
 
 def test_rejects_and_reverts_when_first_run_no_improvement(tmp_path: Path) -> None:
-    # Arrange: first run costs more than best -> reject without running seed B.
+    # Arrange: first run costs more than best. Both seeds still run; the
+    # candidate is measured fully, reverted, and ranked afterwards.
     eval_fn, calls = _eval_counter(
         RunMetrics(pass_rate=0.667, cost_per_successful_task=0.090, cost_per_task=0.090),
         RunMetrics(pass_rate=0.667, cost_per_successful_task=0.069, cost_per_task=0.069),
@@ -179,7 +181,7 @@ def test_rejects_and_reverts_when_first_run_no_improvement(tmp_path: Path) -> No
 
     # Assert
     assert result.accepted is False
-    assert calls["n"] == 1  # short-circuit: seed B never runs
+    assert calls["n"] == 2  # both seeds always run; no short-circuit
     assert result.harness_version == "v0.1"  # restored
     assert (tmp_path / ALLOWED_TARGET).read_text() == ORIGINAL_CONTENT  # reverted
     assert (tmp_path / "experiments" / "rejected_changes.md").exists()
@@ -519,55 +521,12 @@ def test_default_eval_seed_raises_on_subprocess_failure(monkeypatch) -> None:
 def _margin_guardrails() -> Guardrails:
     # best cost mean 0.083, std 0.016 -> threshold 0.067; near-miss band [0.067, 0.083)
     return Guardrails(
-        absolute_success_floor=0.55,
         max_cost_per_successful_task_usd=None,
         max_invalid_action_rate=None,
         accept_margin_sigma=1.0,
     )
 
 
-def test_near_miss_seed_b_extends_to_four_runs_and_accepts(tmp_path: Path) -> None:
-    eval_fn, calls = _eval_counter(
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.060, cost_per_task=0.060),
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.070, cost_per_task=0.070),  # near miss
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.060, cost_per_task=0.060),
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.060, cost_per_task=0.060),
-    )
-
-    result = _run(
-        tmp_path,
-        complete=_fake_complete(_proposal_json()),
-        eval_fn=eval_fn,
-        seeds=(1001, 1002, 1003, 1004),
-        guardrails=_margin_guardrails(),
-    )
-
-    # mean over 4 runs = 0.0625 < threshold 0.067 -> accepted via the extension.
-    assert result.accepted is True
-    assert calls["n"] == 4
-    assert result.record.proxy_seeds == (1001, 1002, 1003, 1004)
-    assert "near-miss" in result.decision.reason.lower()
-
-
-def test_extension_stops_early_when_a_run_regresses(tmp_path: Path) -> None:
-    eval_fn, calls = _eval_counter(
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.060, cost_per_task=0.060),
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.070, cost_per_task=0.070),  # near miss
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.090, cost_per_task=0.090),  # >= best mean
-        RunMetrics(pass_rate=0.667, cost_per_successful_task=0.060, cost_per_task=0.060),
-    )
-
-    result = _run(
-        tmp_path,
-        complete=_fake_complete(_proposal_json()),
-        eval_fn=eval_fn,
-        seeds=(1001, 1002, 1003, 1004),
-        guardrails=_margin_guardrails(),
-    )
-
-    assert result.accepted is False
-    assert calls["n"] == 3  # seed D never runs after C regressed
-    assert (tmp_path / ALLOWED_TARGET).read_text() == ORIGINAL_CONTENT  # reverted
 
 
 def test_no_extension_when_seed_b_fails_outright(tmp_path: Path) -> None:
