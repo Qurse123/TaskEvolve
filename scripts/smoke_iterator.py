@@ -63,7 +63,7 @@ INITIAL_BEST = Distribution(
 # Per-seed fake metrics. Each iteration reserves a 4-seed block. Iteration 1
 # (block 9001..9004) beats the $0.10 baseline at the same success on its first two
 # seeds -> accept. Iteration 2 (block 9005..9008) cannot beat the promoted $0.08
-# best -> reject on the first run (seed B short-circuited).
+# best -> measured on both seeds, reverted, ranked afterwards.
 SEED_START = 9001
 SEED_METRICS: Dict[int, Tuple[float, float]] = {
     9001: (0.6, 0.08),
@@ -247,13 +247,13 @@ def run_smoke_iterator() -> int:
             "iteration 1 accepted", accept.accepted, accept.decision.reason
         )
         failures += not _check(
-            "iteration 1 bumped version v0.1 -> v0.2",
-            accept.harness_version == "v0.2",
+            "iteration 1 reverted; version held at v0.1",
+            accept.harness_version == "v0.1",
             accept.harness_version,
         )
         failures += not _check(
-            "commit hook fired only for the accepted iteration",
-            committed == ["iter_0001"],
+            "commit hook never fires (everything is reverted)",
+            committed == [],
             str(committed),
         )
         failures += not _check(
@@ -261,23 +261,23 @@ def run_smoke_iterator() -> int:
             accept.record_path.exists() and accept.changelog_path.exists(),
         )
         failures += not _check(
-            "iteration 2 rejected (cannot beat promoted best)",
-            not reject.accepted,
+            "iteration 2 measured against the same baseline (no promotion)",
+            reject.record.harness_version == "v0.1",
             reject.decision.reason,
         )
         failures += not _check(
-            "iteration 2 ran only seed A (short-circuit)",
-            len(reject.record.proxy_seeds) == 1,
+            "iteration 2 ran both seeds (no short-circuit)",
+            len(reject.record.proxy_seeds) == 2,
             str(reject.record.proxy_seeds),
         )
         failures += not _check(
-            "version held at v0.2 after the reject",
-            reject.harness_version == "v0.2",
+            "version held at v0.1 throughout",
+            reject.harness_version == "v0.1",
             reject.harness_version,
         )
         failures += not _check(
-            "edited file holds the accepted content (kept on accept; iter 2's revert is a no-op since it re-proposed the same edit)",
-            target_path.read_text(encoding="utf-8") == accept.proposed_edit.new_content,
+            "edited file rolled back to its original content",
+            target_path.read_text(encoding="utf-8") != accept.proposed_edit.new_content,
         )
         # Backlog memory: iteration 2's backlog generation must see iteration 1's record.
         failures += not _check(

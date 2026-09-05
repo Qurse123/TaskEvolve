@@ -172,20 +172,16 @@ def run_iterator(
         if not result.accepted:
             rejected_hashes.add(proposal_hash(result.proposed_edit))
 
-        if result.accepted:
-            # Carry the objective's noise scale forward so the margin stays meaningful.
-            noise_std = best.cost_per_successful_task_std or 0.0
-            current_version = result.harness_version
-            backlog = []  # landscape changed — regenerate hypotheses next iteration
-            best = _distribution_from_result(
-                result, split, current_version, noise_std=noise_std
-            )
+        # No promotion. `best` stays the unmodified-harness baseline for the whole
+        # run, so every candidate is measured against the same reference and the
+        # rows are comparable. The winner is picked from the full table afterwards
+        # by scripts/rank_candidates.py, not greedily here.
 
         logger.info(
-            "%s: %s -> %s | search $%.4f (total $%.4f)",
+            "%s: %s baseline | %s | search $%.4f (total $%.4f)",
             result.iteration_id,
-            "ACCEPT" if result.accepted else "reject",
-            current_version,
+            "beats" if result.accepted else "below",
+            result.proposed_edit.target_file,
             result.search_cost_usd,
             total_search_cost,
         )
