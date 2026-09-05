@@ -7,7 +7,7 @@ Drives the deterministic spine for a single propose -> test -> keep/revert cycle
     4-5. edit_guard checks the target is on the allowed surface (else reject)
     6.   apply the change to the working tree
     7.   run proxy eval at seed A
-    8.   if seed A improves, run proxy eval at seed B (short-circuit otherwise)
+    8.   measure the candidate on both seeds (no short-circuit)
     9-10. acceptance rule: keep iff BOTH runs improve within guardrails, else revert
     11-13. write the iteration note + append to the accepted/rejected changelog
 
@@ -144,7 +144,8 @@ def run_iteration(
         complete: Injected LLM call for the editor (default: configured model).
         eval_seed: Injected per-seed eval (default: one proxy repeat via run_train_eval).
         current_version: Current-best harness version (default: ``config.HARNESS_VERSION``).
-        commit: Optional hook called with the result on accept (e.g. a git commit).
+        commit: Retained for API compatibility; never called, since every
+            candidate is reverted and there is nothing to commit.
         preflight: Injected structural check run after the edit is applied but
             before any eval spend (default: the real subprocess preflight).
         rejected_hashes: Content hashes (``proposal_hash``) of previously rejected
@@ -243,12 +244,15 @@ def run_iteration(
     runs, seeds_used, decision = _run_double(seeds, eval_fn, best, guardrails)
 
     # 9-10. Keep on accept (version stays bumped) or revert (restore file + version).
-    if decision.accepted:
-        result_version = candidate_version
-    else:
-        _revert_edit(repo_root, proposal.target_file, original)
-        config.HARNESS_VERSION = current_version
-        result_version = current_version
+    # Always revert. Every candidate is measured from the same v0.1 starting
+    # point so the rows are directly comparable, and the winner is chosen from
+    # the full table after the run rather than greedily mid-run. Keeping an edit
+    # here would make each later candidate a measurement of a different system.
+    # `decision.accepted` is retained as an advisory flag in the record: it says
+    # whether this candidate beat the baseline, not whether it was kept.
+    _revert_edit(repo_root, proposal.target_file, original)
+    config.HARNESS_VERSION = current_version
+    result_version = current_version
 
     return _persist(
         iteration_id=iteration_id,
@@ -276,36 +280,19 @@ def _run_double(
     best: Distribution,
     guardrails: Guardrails,
 ) -> Tuple[Tuple[RunMetrics, ...], Tuple[int, ...], AcceptanceDecision]:
-    """Run seed A, then seed B only if A improves; on a seed-B near-miss, spend up
-    to two extra seeds and apply the mean rule (§20 M3 amendment)."""
-    run_a = eval_fn(seeds[0])
-    check_a = check_run(run_a, best, guardrails)
-    if not check_a.passed:
-        # 8. Short-circuit: don't spend seed B when the first run already fails.
-        decision = AcceptanceDecision(
-            False,
-            f"rejected: first proxy run did not improve — {check_a.reason}",
-            (check_a,),
-        )
-        return (run_a,), (seeds[0],), decision
+    """Measure the candidate on both seeds. No short-circuit, no early exit.
 
-    run_b = eval_fn(seeds[1])
-    runs = [run_a, run_b]
+    Every candidate gets a complete two-seed measurement so it can be ranked
+    against every other candidate afterwards. Skipping seed B when seed A looked
+    bad discarded measurements we had already paid for and made rows
+    incomparable: one candidate judged on one seed, another on two.
+
+    The returned decision is advisory only. The caller reverts the edit either
+    way; the winner is chosen from the full table once the run is over.
+    """
+    runs = [eval_fn(seeds[0]), eval_fn(seeds[1])]
     used = [seeds[0], seeds[1]]
     decision = evaluate_candidate(tuple(runs), best, guardrails)
-
-    # Near-miss extension: seed B cleared every guardrail and beat the best MEAN
-    # but missed the noise margin — buy statistical power instead of discarding a
-    # likely-real improvement. Stop at the first extension run that regresses.
-    if not decision.accepted and near_miss(run_b, best, guardrails):
-        for seed in seeds[2:MAX_PROXY_RUNS]:
-            run = eval_fn(seed)
-            runs.append(run)
-            used.append(seed)
-            if not near_miss(run, best, guardrails):
-                break
-        decision = evaluate_candidate(tuple(runs), best, guardrails)
-
     return tuple(runs), tuple(used), decision
 
 
@@ -377,7 +364,10 @@ def _persist(
         record_path=record_path,
         changelog_path=changelog_path,
     )
-    if accepted and commit is not None:
+    # The commit hook is disabled: every candidate is reverted, so there is
+    # nothing on disk to commit. `accepted` now only records that the candidate
+    # beat the baseline, which the post-run ranking uses to pick a winner.
+    if False and commit is not None:
         commit(result)
     return result
 
