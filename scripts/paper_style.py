@@ -56,8 +56,46 @@ def apply() -> None:
     })
 
 
-def titled(fig, number: int, title: str, *, x=0.055, y=0.955) -> None:
-    """The Anthropic figure header: a small letterspaced eyebrow above a bold title."""
+def readable() -> None:
+    """Enlarge in-figure text so a page-size figure reads without zooming.
+
+    Call straight after apply(). The paper prints figures at \\textwidth on a
+    1.1in-margin page, so the sizes here are what a reader actually sees.
+    """
+    mpl.rcParams.update({
+        "font.size": 12,
+        "axes.labelsize": 12,
+        "xtick.labelsize": 11.5,
+        "ytick.labelsize": 11.5,
+        "legend.fontsize": 12,
+    })
+
+
+def readable() -> None:
+    """Enlarge in-figure text so a page-size figure reads without zooming.
+
+    Call straight after apply(). The paper prints figures at \\textwidth on a
+    1.1in-margin page, so the sizes here are what a reader actually sees.
+    """
+    mpl.rcParams.update({
+        "font.size": 12,
+        "axes.labelsize": 12,
+        "xtick.labelsize": 11.5,
+        "ytick.labelsize": 11.5,
+        "legend.fontsize": 12,
+    })
+
+
+def titled(fig, number, title: str, *, x=0.055, y=0.955) -> None:
+    """The Anthropic figure header: a bold title, over an optional eyebrow.
+
+    Pass number=None when the figure sits in a LaTeX float, so the caption owns
+    the numbering and a reader sees one number rather than two.
+    """
+    if number is None:
+        fig.text(x, y, title, fontsize=15.5, color=INK,
+                 fontweight="bold", va="top", linespacing=1.32)
+        return
     fig.text(x, y, f"F I G U R E   {number}", fontsize=7.6, color=MUTED,
              fontweight="medium", va="top")
     fig.text(x, y - 0.052, title, fontsize=15.5, color=INK,

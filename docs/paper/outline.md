@@ -370,7 +370,7 @@ End with the larger implication:
 
 # Appendix A. Verified numbers
 
-Validity-gated from `experiments/results.csv`. 9 of 129 ledger rows are crashed or superseded runs
+Validity-gated from `experiments/results.csv`, 352 rows. 9 are crashed or superseded runs
 excluded per the pre-registered validity gate. Held-out test splits, N=5, seeds 4001 to 4005.
 
 | System | Retail, 40 tasks | Airline, 20 tasks | Telecom, 40 tasks |

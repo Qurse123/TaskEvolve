@@ -260,5 +260,3 @@ and (b) not overstating the open-weight cost advantage as intrinsic efficiency.
 - Provenance, seeds, serving paths, pricing registration, known gaps:
   `provenance.md`. Amortized fine-tune break-even: `amortized_cost.md`.
   Latency third axis: `latency.md`. Threats catalogue: `threats_to_validity.md`.
-</content>
-</invoke>

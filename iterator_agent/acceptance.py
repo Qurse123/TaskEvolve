@@ -2,19 +2,22 @@
 
 No LLM. A candidate harness change is accepted iff BOTH of its proxy runs
 **improve** the optimization objective (mean ``cost_per_successful_task`` below
-the current-best mean by the noise margin) AND **clear every guardrail** (an
-absolute success floor + optional cost / invalid-action ceilings declared in
-``allowed_edits.yaml``). Otherwise the change is reverted.
+the current-best mean by the noise margin) AND **clear every guardrail** (the
+optional cost / invalid-action ceilings declared in ``allowed_edits.yaml``).
+Otherwise the change is reverted.
 
 Objective = **cost per successful task** (cost ÷ success). This single scalar
 *is* the cost-vs-precision tradeoff the study optimizes: lowering it means the
 agent got cheaper, more successful, or struck a favorable trade. A change that
-tanks success raises the metric and self-rejects; a genuine cost cut — token
-savings OR a cheaper model that holds up — lowers it and is accepted. This
-replaces the earlier single-objective rule (mean cost per task at a *relative*
-0.95×best success floor), which structurally rejected every cost-for-precision
-tradeoff — the frontier is multi-objective, so success is now only a **low
-absolute floor** (anti-gaming), not a moving target pinned to the current best.
+tanks success raises the metric and self-rejects; a genuine cost cut, whether
+token savings or a cheaper model that holds up, lowers it and is accepted.
+
+There is **no task-success floor**, because success already sits inside the
+objective: a candidate that halves cost and halves success leaves the number
+unchanged. Earlier rules did impose one, first a relative 0.95×best floor and
+later a low absolute floor, and both discarded measurements before the objective
+was computed. The only remaining guardrails are the two ceilings above, which
+are declared and currently unset.
 """
 
 from __future__ import annotations
@@ -44,9 +47,10 @@ class RunMetrics:
     pass_rate: float
     cost_per_successful_task: Optional[float]
     invalid_action_rate: Optional[float] = None
-    # Optimization objective: mean cost per task (total_cost / num_tasks). Fixed
-    # denominator -> ~4x less variance than cost-per-successful-task, so genuine
-    # token savings clear the noise margin at n=2 seeds.
+    # Mean cost per task (total_cost / num_tasks). Its fixed denominator gives it
+    # ~4x less variance than cost per successful task, so it is carried for
+    # reporting and for the multi-split aggregate. It is NOT the accept objective:
+    # _threshold() tests cost_per_successful_task against the baseline.
     cost_per_task: Optional[float] = None
     # Tasks that crashed inside the harness (termination_reason "harness_error").
     # Any crash invalidates the run as an acceptance sample: crashed tasks do no
@@ -58,11 +62,9 @@ class RunMetrics:
 class Guardrails:
     """Acceptance guardrails declared in allowed_edits.yaml (frozen for the run)."""
 
-    # Absolute task-success floor (anti-gaming): a candidate whose proxy success
-    # drops below this is rejected no matter how cheap it is. Absolute, NOT a
-    # fraction of the current best — the frontier is multi-objective, so a cheaper
-    # point with somewhat lower success is a legitimate tradeoff to keep, provided
-    # it stays above this floor and improves cost per successful task.
+    # Cost ceiling: a candidate whose cost per successful task exceeds this is
+    # rejected however much it improves on the baseline. Declared as null in
+    # allowed_edits.yaml, so it is currently not enforced.
     max_cost_per_successful_task_usd: Optional[float]
     max_invalid_action_rate: Optional[float]
     # Noise floor: a run must beat the current-best cost mean by at least this many

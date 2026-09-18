@@ -42,14 +42,11 @@ from typing import (
 )
 
 from iterator_agent.acceptance import (
-    MAX_PROXY_RUNS,
     AcceptanceDecision,
     Guardrails,
     RunMetrics,
-    check_run,
     evaluate_candidate,
     load_guardrails,
-    near_miss,
 )
 from iterator_agent.baseline import Distribution, load_distribution
 from iterator_agent.edit_guard import EditPolicy, evaluate, load_policy
@@ -364,11 +361,9 @@ def _persist(
         record_path=record_path,
         changelog_path=changelog_path,
     )
-    # The commit hook is disabled: every candidate is reverted, so there is
+    # The commit hook is never called: every candidate is reverted, so there is
     # nothing on disk to commit. `accepted` now only records that the candidate
     # beat the baseline, which the post-run ranking uses to pick a winner.
-    if False and commit is not None:
-        commit(result)
     return result
 
 

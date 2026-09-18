@@ -7,24 +7,29 @@ dependencies = [
     "tau2[knowledge,gym]",
     "jinja2>=3.1",
     "litellm>=1.40",
-    "pydantic>=2.0",
     "python-dotenv>=1.0",
     "matplotlib>=3.8",
+    "numpy>=1.26",
     "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
-    "pytest-asyncio>=0.23",
 ]
 
 [tool.uv.sources]
 tau2 = { path = "vendor/tau2-bench", editable = true }
+
+[tool.pytest.ini_options]
+# Collection must stay inside our own suite. The vendored tau2-bench ships voice
+# and streaming tests whose imports fail here, and pytest aborts the whole run on
+# a collection error, so without this the suite does not start.
+testpaths = ["tests"]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["target_agent", "benchmark", "results", "DB", "settings", "scripts", "iterator_agent"]
+packages = ["target_agent", "benchmark", "results", "settings", "scripts", "iterator_agent", "arm_d"]

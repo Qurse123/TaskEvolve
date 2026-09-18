@@ -194,7 +194,7 @@ Proxy and validation task IDs are generated once by `benchmark/splits.py` with a
 **Access control:**
 - **Iterator sees only proxy results** during optimization. It may never read validation or TAU2 test split results.
 - **Validation** runs exactly once after all optimization iterations are complete, as a post-hoc overfitting check. "Once" means one validation event with the precommitted repeated run set above, not one stochastic task pass.
-- **TAU2 test split** runs exactly once at milestone end for final reporting via `scripts/run_tau_test.py`.
+- **TAU2 test split** runs exactly once at milestone end for final reporting via `scripts/run_train_eval.py --split test_{retail,airline,telecom}`. It has been run; see `README.md`. No `scripts/run_tau_test.py` was ever written.
 
 **Transfer domain:** airline (held for Milestone 4+). After optimizing on retail, we measure cost-performance on airline and telecom with the same harness, un-modified — this directly tests whether improvements are domain-general or domain-specific.
 
@@ -351,7 +351,7 @@ TaskEvolve/
 └── scripts/
     ├── run_smoke.py           # 3 mock tasks — verify wiring, zero LLM cost
     ├── run_train_eval.py      # run proxy or validation split, write results
-    └── run_tau_test.py        # run TAU2 official test split — once at milestone end
+    └── (test splits run through run_train_eval.py --split test_*, not a separate script)
 ```
 
 ---

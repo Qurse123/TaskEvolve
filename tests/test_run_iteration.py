@@ -238,7 +238,7 @@ def test_malformed_harness_version_fails_before_edit_or_eval(tmp_path: Path) -> 
     assert (tmp_path / ALLOWED_TARGET).read_text() == ORIGINAL_CONTENT
 
 
-def test_accept_invokes_commit_hook(tmp_path: Path) -> None:
+def test_accept_does_not_invoke_commit_hook(tmp_path: Path) -> None:
     # Arrange
     eval_fn, _ = _eval_counter(
         RunMetrics(pass_rate=0.667, cost_per_successful_task=0.071, cost_per_task=0.071),
@@ -254,8 +254,9 @@ def test_accept_invokes_commit_hook(tmp_path: Path) -> None:
         commit=lambda res: committed.append(res.iteration_id),
     )
 
-    # Assert
-    assert committed == ["iter_0001"]
+    # Assert: an accepted candidate is still reverted, so there is nothing on
+    # disk to commit and the hook stays unused.
+    assert committed == []
 
 
 class _CostingComplete:

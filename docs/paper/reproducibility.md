@@ -26,15 +26,17 @@ strings, dates, seeds, pricing registration) lives in
 | `tau2[knowledge,gym]` | vendored, editable (`tool.uv.sources`) — see §1.2 | `pyproject.toml` dep + `[tool.uv.sources]` |
 | `litellm` | `>=1.40` | `pyproject.toml` |
 | `jinja2` | `>=3.1` | `pyproject.toml` |
-| `pydantic` | `>=2.0` | `pyproject.toml` |
 | `python-dotenv` | `>=1.0` | `pyproject.toml` |
 | `matplotlib` | `>=3.8` | `pyproject.toml` |
 | `pyyaml` | `>=6.0` | `pyproject.toml` (pinned for the iterator's `allowed_edits.yaml` guard) |
-| `pytest` / `pytest-asyncio` | `>=8.0` / `>=0.23` (dev extra) | `pyproject.toml` `[project.optional-dependencies]` |
+| `numpy` | `>=1.26` | `pyproject.toml` |
+| `pytest` | `>=8.0` (dev extra) | `pyproject.toml` `[project.optional-dependencies]` |
 
-`numpy` is used by the statistics/plotting scripts (`scripts/paper_stats.py`,
-`scripts/plot_results.py`); it arrives transitively via `matplotlib`/`tau2` rather than
-as a top-level pin. **`scipy` is deliberately NOT a dependency** — `paper_stats.py`
+`numpy` is used by the statistics and figure scripts (`scripts/paper_stats.py`,
+`scripts/plot_paper_fig2_tokens_vs_cost.py`, `scripts/plot_paper_fig3_telecom_handoff.py`)
+and is now declared directly rather than relied on transitively. `pydantic` and
+`pytest-asyncio` were declared with no importer anywhere in the repo and were dropped in
+the 2026-09 cleanup. **`scipy` is deliberately NOT a dependency** — `paper_stats.py`
 implements percentile-bootstrap CIs and permutation tests in pure numpy/stdlib
 specifically to avoid it (see `docs/paper/analysis/statistics.md` header).
 
@@ -246,14 +248,14 @@ user-sim `gpt-4.1-2025-04-14`, temp `0.0` (dropped where rejected), max 200 step
 | Question | Answer | Where / gap |
 |---|---|---|
 | **Code released?** | **Yes** — full harness, iterator, Arm D training/serving, analysis scripts in this repo. | `target_agent/`, `iterator_agent/`, `arm_d/`, `scripts/`, `settings/`. |
-| **Environment pinned?** | **Partial.** Floor pins (`>=`) in `pyproject.toml`; TAU2 pinned to a known commit. **No `uv.lock`** committed → not byte-exact. | §1; gap: no lockfile (§5). |
+| **Environment pinned?** | **Partial.** Floor pins (`>=`) in `pyproject.toml`; TAU2 pinned to a known commit. `uv.lock` is committed. | §1. |
 | **Data / splits available?** | **Yes** — all split files are in-repo as task-id lists; disjointness scriptable; TAU2 tasks come from the pinned vendor commit. | §3.1; `benchmark/splits/`, `scripts/check_split_disjointness.py`. |
 | **Seeds reported?** | **Yes, but off-ledger.** Conventions documented and stored in per-task JSONs; **no `seed` column in `results.csv`** → runs can't be paired across arms. | §3.2; provenance G1; statistics.md (unpaired-only + recommendation to add the column). |
 | **Compute / cost reported?** | **Mostly.** Runtime (eval) cost recorded per run in `results.csv`; per-token prices registered in `settings/pricing.py`; iterator search-cost tracked separately. **Tinker LoRA training cost is unrecorded** (`training_cost_usd=0.0`, no billing telemetry). | provenance §"Fine-tune provenance", G3. |
 | **Error bars?** | **Yes.** Mean ± std over N=5 (N=3 Arm D) is the reported number; bootstrap 95% CIs in statistics.md. | `docs/paper/analysis/statistics.md`; plots via `scripts/plot_results.py`. |
 | **Stats method disclosed?** | **Yes.** Percentile-bootstrap CIs + Holm-corrected permutation tests, pure numpy (no scipy); small-n low power and the p-floor (2/20=0.10 at n=3) disclosed up front. | `docs/paper/analysis/statistics.md`; `scripts/paper_stats.py`. |
 | **Model versions pinned?** | **Partial.** User-sim snapshot is pinned (`gpt-4.1-2025-04-14`). Agent closed models record bare aliases (`gpt-4.1`, `claude-opus-4-8`) — underlying provider snapshot **not** pinned. | provenance G4; §5. |
-| **Ablations / controls?** | **Yes.** Arm D uses a matched base control through the identical shim; harness held at v0.1 across the model axis for a clean model comparison. | `experiments/arm_d_eval_precommit.md`; `docs/paper/analysis/ablations_plan.md`. |
+| **Ablations / controls?** | **Yes.** Arm D uses a matched base control through the identical shim; harness held at v0.1 across the model axis for a clean model comparison. | `experiments/arm_d_eval_precommit.md`. Further ablations were scoped but not run. |
 | **Pre-registration?** | **Yes.** Blind events pre-committed before any score seen. | `experiments/{validation_event_v0.2,arm_d_eval,test_split}_precommit.md`. |
 
 ---
@@ -275,7 +277,7 @@ user-sim `gpt-4.1-2025-04-14`, temp `0.0` (dropped where rejected), max 200 step
 3. **Non-determinism even at temperature 0.** LLM user-simulation plus provider
    non-determinism means run-to-run variance is real; this is exactly why every result
    is an N-run distribution, not a point (§3.3).
-4. **No committed lockfile.** Floor version pins only (§1.1). Add `uv.lock` for
+4. ~~**No committed lockfile.**~~ Resolved: `uv.lock` is committed. Floor pins remain in `pyproject.toml` (§1.1), and the lockfile is what makes a resolution reproducible. Original note:
    byte-exact dependency reproduction.
 5. **Banking agentic-shell binaries unpinned.** `ripgrep`/`srt` versions are not fixed
    by this repo (§1.3); banking is a near-floor transfer probe, so this is low-impact.
