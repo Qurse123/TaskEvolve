@@ -41,7 +41,7 @@ events — prepared here but deliberately **not executed**, per the standing
 | 9 | Justify the metric (`cost_per_successful_task`); what it hides; show alternative view. | ✅ | `docs/paper/analysis/metric_justification.md` + `scripts/plot_metric_views.py` (+test) + `experiments/plots/metric_views.png`. |
 | 10 | Measure **latency** (third axis). | ✅ | `scripts/latency_analysis.py` (+test) + `docs/paper/analysis/latency.md` + `experiments/plots/latency_by_arm.png`. **Finding: cheap ≠ fast — tuned model is slowest retail arm (76.7s vs Inkling 18.7s).** |
 | 11 | **Error analysis / failure taxonomy** (esp. banking 0.10 floor). | ✅ | `scripts/error_taxonomy.py` (+test) + `docs/paper/analysis/error_analysis.md`. **Findings: dominant failure = wrong DB write (792/995); `user_stop` masks 76% of failures; banking floor is genuine (0.10, unmoved by tuning) — agent over-retrieves then commits wrong writes, not retrieval starvation.** |
-| 12 | **Ablations** — Arm D (rank, distill size, domain mix); Arm B (edit levers). | ⏸ | `docs/paper/analysis/ablations_plan.md` — **plan only; needs paid Tinker re-training + re-eval (Arm B lever attribution possibly $0 if iteration logs survive). NOT run.** |
+| 12 | **Ablations** — Arm D (rank, distill size, domain mix); Arm B (edit levers). | ⏸ | **Not run, and no plan document was written.** Needs paid Tinker re-training plus re-eval; Arm B lever attribution may be $0 if the iteration logs survive. |
 | 13 | Exact experimental provenance (versions, providers, sampling, dates). | ✅ | `docs/paper/analysis/provenance.md` + `scripts/provenance.py` (+test). Flags 7 gaps incl. stale `.env.example` user-sim note + Arm B model-label discrepancy. |
 
 ## Tier 3 — Strengthens / polishes
@@ -50,7 +50,7 @@ events — prepared here but deliberately **not executed**, per the standing
 |---|------|--------|-------------|
 | 14 | Paper scaffolding: abstract, contributions, problem/frontier definition, Related Work, Broader Impact/Ethics. | ✅ | `docs/paper/draft_sections.md` (abstract, 6 contributions, formal frontier def, related-work pointer, ethics). |
 | 15 | Reproducibility artifact + checklist. | ✅ | `docs/paper/reproducibility.md` (env pins, per-arm repro commands, frozen inputs, NeurIPS checklist, limitations; flagged no lockfile + vendor plain-clone + `srt`/`rg` maybe not in code path). |
-| 16 | Widen external validity — second benchmark. | ⏸ | `docs/paper/analysis/external_validity_plan.md` — **plan only; needs new benchmark integration + paid runs. NOT run.** (TAU2's 4 domains = partial breadth already.) |
+| 16 | Widen external validity — second benchmark. | ⏸ | **Not run, and no plan document was written.** Needs a new benchmark integration plus paid runs. (TAU2's 4 domains = partial breadth already.) |
 | 17 | Fairness/neutrality of the shared harness. | ✅ | `docs/paper/analysis/harness_neutrality.md`. **v0.1 is model-generic (empty few-shots, deterministic policy extractor); bias is one-directional (can only favor gpt-4.1, which is dominated) → open/frontier advantage is a lower bound.** Empirical per-model adapted-harness sweep deferred (paid). |
 | 18 | Cost-measurement methodology subsection. | ✅ | `docs/paper/analysis/cost_methodology.md` (capture path, exact pricing table, included/excluded, pricing-vs-efficiency, gaps). |
 

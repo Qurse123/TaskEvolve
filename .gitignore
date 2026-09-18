@@ -7,10 +7,12 @@ __pycache__/
 # Vendored external dependency (cloned + built locally, never committed)
 vendor/
 
-# Run artifacts (regenerable; official numbers live in docs)
+# Run artifacts. Regenerable only by paying for the runs again, so the two
+# small ledgers that every figure and statistic is computed from are tracked:
+# experiments/results.csv and experiments/analysis/test_task_stats.csv.
+# The bulky inputs they were derived from stay out.
 experiments/logs/
 experiments/plots/
-experiments/results.csv
 experiments/*.db
 
 # Bulky per-run console logs (regenerable; verdicts live in experiments/iterations + results.csv).
@@ -26,3 +28,11 @@ experiments/accepted_changes.md
 experiments/rejected_changes.md
 # Archived contaminated runs/plots (kept locally for reference, not committed).
 experiments/archive_contaminated/
+
+# Local tool state.
+.pytest_cache/
+.claude/
+
+# TAU2 writes its embeddings cache to a cwd-relative data/ directory when the
+# banking_knowledge domain runs. Regenerable, and the payload is ~16 MB.
+data/

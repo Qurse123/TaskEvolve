@@ -2,17 +2,26 @@
 
 ## What This Repo Is
 
-A controlled measurement study of LLM agent cost-performance tradeoffs on TAU2-bench (retail domain). We optimize a task agent across 6 experimental arms and measure cost per successful task vs task success rate.
+A controlled measurement study of LLM agent cost-performance tradeoffs on TAU2-bench, across the retail, airline and telecom domains. We optimize a task agent across several experimental arms and measure cost per successful task vs task success rate.
 
-Full design: `systems_design.md` | Research spec: `experiment.md`
+Full design: `systems_design.md` | Research spec: `experiment.md` | Reproduction steps: `README.md`
 
 ---
 
-## Current Status: **Methodology reframe + autonomous iterator ✅ COMPLETE** (2026-07-29) — the acceptance rule was single-objective (accept iff cheaper AND ≥0.95×best success), which structurally rejects every cost-for-precision tradeoff in what is really a multi-objective frontier study. Fixed: objective is now **cost per successful task** with a **low absolute success floor (0.5)**, and the iterator was **un-biased** into a general autonomous hypothesis-tester (model choice is one lever among five, not a hand-fed answer). The un-biased iterator then **autonomously discovered the Opus→Sonnet whole-agent swap** and it **transfers cleanly on blind validation** (see entry below). M3 **Arm C ✅** (naive Inkling Pareto-beats gpt-4.1). Milestone 2 (original strict-rule Arm B) verdict was **proxy-overfit**. Milestone 1 ✅. Next: M3 **Arm D** (fine-tune Inkling via Tinker, static v0.1 harness). TAU2 test-split run stays **deferred**.
+## Current Status: **Study complete, paper written** (2026-09-17)
+
+The held-out TAU2 test splits have been run and are the reported headline. `README.md` carries the verified numbers, the system-to-ledger mapping, and the exact reproduction commands; treat it as the current source of truth over the milestone history below.
+
+- **Four reported systems**, each N=5 on `test_retail` 40, `test_airline` 20, `test_telecom` 40, seeds 4001-4005: Opus 4.8 static `v0.1`, Opus 4.8 plus iterator `v0.5`, Inkling-Small base `v0.1`, Inkling-Small fine-tuned `v0.1`.
+- **Headline:** base Inkling-Small matches or exceeds Opus 4.8 on task success in all three domains at 7.9 to 12.3× lower cost per successful task; fine-tuning reaches 13.7 to 16.3× lower; harness optimization cuts Opus cost 11.2% / 19.7% / 23.8% while giving up 2.5 / 9.0 / 21.5 percentage points of task success, leaving it dominated by both open-weight systems.
+- **M3 Arm D ✅ COMPLETE** (LoRA rank 32 on Inkling-Small via Tinker, trained 2026-08-07). M3 Arm C ✅. Milestone 2 Arm B verdict was **proxy-overfit**, and the paper reports it as such. Milestone 1 ✅.
+- **Arms E and F in `experiment.md` were never built.** The six-arm plan there is superseded.
+- **Harness versions are row labels, not code.** `v0.1` is the current `target_agent/`. `v0.5` is `v0.1` plus the three accepted edits in `experiments/accepted_changes.md` (`iter_0014`, `iter_0020`, `iter_0021`), whose net effect is sending the domain policy on turn 1 only. **The `v0.2`-`v0.4` harness source was never committed and is unrecoverable**, so those ledger rows cannot be re-run from this tree.
+- **`experiments/results.csv` and `experiments/analysis/test_task_stats.csv` are now tracked**, so every figure, table and statistic regenerates from a clean clone at $0. The 856 MB `experiments/logs/` tree and `experiments/plots/` stay local.
 
 ### Methodology reframe + autonomous iterator (Arm B v0.2, corrected) ✅ COMPLETE (2026-07-29)
 **Why:** the strict single-objective rule + a model-biased editor were rejecting real tradeoffs and hand-feeding the "answer." Reframed to a Pareto cost-vs-precision study and let the iterator explore autonomously.
-- **Acceptance rule (`acceptance.py`):** objective = `cost_per_successful_task` (cost ÷ success — the scalar that *is* cost-vs-precision); success guardrail = **absolute floor 0.5** (`allowed_edits.yaml: absolute_success_floor`), replacing the relative `0.95×best`. `run_iterator.py` carries the cost/successful-task noise σ forward after an accept.
+- **Acceptance rule (`acceptance.py`):** objective = `cost_per_successful_task` (cost ÷ success — the scalar that *is* cost-vs-precision). This entry described an absolute success floor of 0.5; **that floor was later removed and no success guardrail exists today.** `allowed_edits.yaml` now declares only two null ceilings plus `accept_margin_sigma: 1.0`, on the reasoning that success already sits inside the objective. `run_iterator.py` carries the cost/successful-task noise σ forward after an accept.
 - **Un-biased editor:** `prompts/{diagnose,propose_edit,generate_tickets}.j2` reframed to "reduce cost per successful task, keep success high," listing all five edit files equally (model = one lever). `preflight_check.py` allows the Anthropic pool `{opus, sonnet, haiku}` so a model hypothesis isn't rejected as off-pool.
 - **Run (Opus editor, 6 iterations, 1 accepted):** iter_0002 **autonomously proposed switching the whole agent Opus→Sonnet 5** (single model, no per-turn routing). Proxy: cost/successful-task **$0.758→$0.219 (−71%)**, success 0.767→0.833. Committed `cbb0e8c` (v0.2). Every later prompt/harness edit failed to beat the Sonnet baseline.
 - **Blind validation N=5 (seeds 2001–2005): success 0.851 ± 0.051, cost/successful task $0.215 ± $0.018.** Proxy predicted 0.833 @ $0.219 → **transfers cleanly, zero overfit** (the opposite of the original strict-rule Arm B). vs Opus v0.1 (0.903 @ $0.578/succ): −5pp success for **−63% cost/successful-task**.
@@ -53,7 +62,7 @@ Build the harness, run the agent, get a baseline score. Nothing else.
 - [x] ~~`target_agent/traces/langfuse_setup.py`~~ — Langfuse tracing (built in M1; **removed in M2** — observability is local files only, see "Key Architecture Facts")
 - [x] **Generate split JSONs** — `benchmark/splits/{smoke,proxy,validation}.json` written (3 mock / 12 + 35 retail-train, seed 42; proxy⟂validation disjoint). Now frozen.
 - [x] `results/logger.py` — per-run folder JSON logs (start_run / log_task / finalize_run)
-- [x] `DB/storage.py` — SQLite mirror of `results.csv` (`results` table keyed by `run_id`); sync via `python -m DB.storage`, open `experiments/results.db` in DBeaver. CSV stays canonical; DB is a regenerable query layer (no server — YAGNI for ~100 run-rows).      
+- [x] ~~`DB/storage.py`~~ — a SQLite mirror of `results.csv` was built in M1 and **removed in the 2026-09 cleanup**: nothing ever imported it, it had no test, and no documented workflow used `experiments/results.db`. The CSV is canonical and is now tracked, so query it directly.
 - [x] `scripts/run_smoke.py` — 3 mock tasks, verify wiring at zero cost (built; imports + split-load verified at $0). Run via `python -m scripts.run_smoke`.
 - [x] **Run smoke test** ← PASSED 3/3 (mock domain, ~$0.009 total). Full chain verified: splits → agent → orchestrator → evaluator → results logger (JSON+CSV) → SQLite mirror. cost_per_successful_task flowing.
 - [x] `scripts/run_train_eval.py` — proxy/validation runner (`--split --seed-start S --repeats N`; each repeat = one `results.csv` row; prints mean ± std). Built + verified at $0 (helpers, split-load, arg-validation). Run: `python -m scripts.run_train_eval --split proxy --repeats 5 --seed-start 1001`.
@@ -134,14 +143,15 @@ A run starts when a **ticket** (the kickoff work-item: optimization objective + 
 - [x] **Smoke the iterator loop (~$0)** — `scripts/smoke_iterator.py` drives the **real** `run_iterator`→`run_iteration` chain end-to-end with every external call faked (injected `complete`/`eval_seed`, a seeded fake proxy run dir for `build_feedback`, all writes to a throwaway temp tree — no real `experiments/` mutation, $0). Asserts the three decision paths the loop must get right: **accept** (both proxy runs improve → version bumps `v0.1`→`v0.2`, record+changelog written, commit hook fires, driver promotes candidate to new current-best), **reject/hill-climb** (next iteration can't beat the promoted best → reverted, seed B short-circuited, version held), and **forbidden-target pre-eval reject** (frozen path rejected before any eval — eval fn wired to raise if reached), plus a focused **revert-restores-prior-content** scenario. Run: `python -m scripts.smoke_iterator` → 12/12 checks pass; `config.HARNESS_VERSION` saved/restored so it leaves no global side effect. This is the wiring gate before any real proxy spend.
 - [x] **AutoPK-ported iteration hardening (July 2026)** — four practices ported from the AutoPK campaign system after the first Arm B run burned five proxy runs on a broken `harness.py` edit (`ValidationError: SystemMessage role missing`, all tasks `harness_error`, empty iteration records). (1) **$0 preflight before eval spend** (`iterator_agent/preflight.py` + `preflight_check.py`, AutoPK "validate before eval"): after the edit is applied, a subprocess compiles + exercises the edited tree — `build_messages` on a realistic 30-message conversation, `filter_tools`, `get_model` ∈ {gpt-4.1, gpt-4.1-mini}, all three templates rendered StrictUndefined via agent.py's chain — and a failing candidate is reverted + rejected before any proxy run (`experiment.md §20` rule 5, §21 step 5). (2) **Invalid-run guardrail** (AutoPK "never accept what cannot be verified"): `RunMetrics.harness_error_count` (from `termination_reason` prefix, via `run_train_eval`) — any harness crash fails `check_run` regardless of apparent cost improvement. (3) **Rejected-change memory** (AutoPK bounce guard / rejected-ticket dedupe): the driver hashes every rejected edit (`proposal_hash` = target + content, prose excluded); a content-identical re-proposal is refused at $0. (4) **Fresh-process evals** (AutoPK one-shot dispatcher): `_default_eval_seed` now runs `scripts.run_train_eval --metrics-json` in a subprocess with `HARNESS_VERSION` exported (config reads the env override) — fixing a real stale-module bug where in-process evals kept running the previously imported `harness.py`/`model_routing.py` instead of the candidate. TDD throughout: 137 tests green, smoke_iterator 19/19 (new Scenario E: preflight reject pre-eval).
 - [x] **Arm B run 3 prep (July 2026): near-miss seed extension + stronger editor.** Run 3 (seeds 3101+, killed externally mid-iter-6) produced 5 clean rejects and exposed two bottlenecks: (a) real-but-modest savings die at n=2 (iter 4 beat baseline on both seeds, missed the 1σ margin by 0.9% on seed B), and (b) gpt-4.1 as editor proposes crude edits (drop-all-tools → 186-turn flail runs; broken compression caught by preflight at $0). Fixes: **(1) §20 M3 amendment** — on a seed-B near-miss (clears guardrails + beats best mean, misses margin) run up to 2 extra seeds; accept iff every run beats the best mean within guardrails AND the n≥3 mean cost clears the same μ−kσ threshold (`acceptance.near_miss`/`MAX_PROXY_RUNS=4`; driver reserves disjoint 4-seed blocks per iteration, so `--seed-start` spacing is now ×4). **(2) `ITERATOR_MODEL=o3`** (verified reachable; `drop_params=True` in `researcher._litellm_raw` so o-series rejects nothing). 145 tests green, smoke 19/19.
-- [ ] **Run Arm B optimization on proxy** under the fixed budget — accepted changes accumulate into the Arm B harness (`HARNESS_VERSION` bumped per accept). Iterator sees proxy only. **Now hypothesis-driven + time-boxed:** the driver generates a ranked backlog of testable **hypothesis tickets** (`iterator_agent/hypothesis.py` + `prompts/generate_tickets.j2`) from the current-best proxy evidence, works one ticket per iteration (the ticket pins the editor to one surface and skips the diagnose call), and regenerates the backlog on empty/after-accept (hill-climb). Budget bounds: `--max-minutes` (wall-clock, primary) OR/AND `--max-iterations` (reproducible ceiling) OR/AND `--max-search-cost-usd`, whichever trips first. Feedback broadened (proxy-only) with a tool-usage histogram, mean turns/tool-calls, and failed-task digests (`feedback.py`). Run: `python -m scripts.run_iterator --max-minutes <M> --seed-start 3001 --max-iterations <cap> [--max-search-cost-usd <cap>]`.
+- [x] **Run Arm B optimization** under the fixed budget. The reported campaign ran 2026-09-05 to 2026-09-06 for 24 hours via `scripts/run_armb_campaign.py` against the three `search_*` splits, producing 23 iterations with 3 accepted (`experiments/accepted_changes.md`). Original plan text follows.
+- [x] **Run Arm B optimization on proxy** under the fixed budget — accepted changes accumulate into the Arm B harness (`HARNESS_VERSION` bumped per accept). Iterator sees proxy only. **Now hypothesis-driven + time-boxed:** the driver generates a ranked backlog of testable **hypothesis tickets** (`iterator_agent/hypothesis.py` + `prompts/generate_tickets.j2`) from the current-best proxy evidence, works one ticket per iteration (the ticket pins the editor to one surface and skips the diagnose call), and regenerates the backlog on empty/after-accept (hill-climb). Budget bounds: `--max-minutes` (wall-clock, primary) OR/AND `--max-iterations` (reproducible ceiling) OR/AND `--max-search-cost-usd`, whichever trips first. Feedback broadened (proxy-only) with a tool-usage histogram, mean turns/tool-calls, and failed-task digests (`feedback.py`). Run: `python -m scripts.run_iterator --max-minutes <M> --seed-start 3001 --max-iterations <cap> [--max-search-cost-usd <cap>]`.
 - [x] **Blind validation event — N=5, seeds `2001..2005` — VERDICT: PROXY-OVERFIT.** Run 4 (o3 editor) produced one accepted change (v0.2, commit `458fe57`: send system prompt only on first turn; proxy −18% cost/task at held success). The blind event (criterion precommitted in `experiments/validation_event_v0.2_precommit.md` before launch): pass 0.720 ± 0.037 vs required ≥0.766 → **FAIL**; cost/successful task $0.0531 ± $0.0041 (< $0.062 ✓); zero harness errors ✓. The cost gain transferred (−24% cost/task) but success regressed 0.806→0.720 — a cost-for-success trade the 12-task proxy could not detect. Reported per §20 tail as proxy-overfit; v0.2 stands as a *different frontier point*, not a dominating one. Figure: `experiments/plots/armA_vs_armB_validation_frontier_20260719.png`. (Event note: interrupted externally after 2 seeds; completed detached with no intermediate system changes.)
 
 **Plots:**
 
 - [x] **Per-iteration trajectory plot** (`scripts/plot_results.py --trajectory`, reads `experiments/iterations/*/iteration.json`) — mean cost per task **and** task success rate vs iteration number (`experiment.md §25.1/§25.2`). Accepted iterations are filled ◆ and joined into the running-best hill-climb line; rejected iterations are hollow markers at the value they attempted. Built + tested (`tests/test_plot_results.py`). Renders after the real run produces `iteration.json` records.
-- [ ] **Arm A vs Arm B frontier** — with ≥2 arms, the existing `plot_results.py` frontier mode auto-activates (cost-vs-success scatter, arm means as ◆ with std error bars) — the first real Pareto comparison.
-- [ ] _(milestone end, optional)_ **TAU2 official test split once** via `scripts/run_tau_test.py` — final Arm B reporting, run once, reported conservatively.
+- [x] **Arm A vs Arm B frontier** — `plot_results.py` frontier mode. Superseded for the paper by `scripts/plot_paper_fig1_frontier.py`, which plots all four reported systems across the three held-out splits with every seed run shown.
+- [x] **TAU2 official test split, run once** via `scripts/run_train_eval --split test_*`, N=5, seeds 4001-4005, per `experiments/test_split_precommit.md`. Results in `README.md`.
 
 ---
 
@@ -153,19 +163,29 @@ A run starts when a **ticket** (the kickoff work-item: optimization objective + 
    - `vendor/tau2-bench/` — everything in here
    - `benchmark/splits/*.json` — task IDs are fixed at generation time
 4. **Validation runs once as a blind post-hoc event**, after all iterations complete. That event contains the precommitted repeated run set (`N=5`, seeds `2001..2005`); the iterator never sees these logs during optimization.
-5. **TAU2 test split runs once**, at milestone end, via `scripts/run_tau_test.py`.
+5. **TAU2 test split runs once**, at milestone end, via `scripts/run_train_eval --split test_{retail,airline,telecom}`. It has been run; see `experiments/test_split_precommit.md` for the pre-registered design and `README.md` for the results. There is no `scripts/run_tau_test.py`; earlier docs named one that was never written.
 6. **Double-run rule:** before committing a change, the iterator must run proxy eval twice with different, logged seeds. Both must show improvement against the current best proxy distribution without crossing cost, policy, invalid-action, or latency guardrails.
 
 ---
 
 ## Eval Splits Quick Reference
 
-| Split | Tasks | Cost | Who uses it |
-|-------|-------|------|-------------|
-| Smoke | 3 (mock domain) | ~$0 | Wiring check only |
-| Proxy | 12 (retail train) | ~$3/run | Iterator trains against this |
-| Validation | 35 (retail train) | ~$10 | Post-hoc overfitting check only |
-| TAU2 test | ~40 (official) | ~$12 | Final paper reporting, once |
+All 15 split files live in `benchmark/splits/` and are frozen. Costs are measured Opus 4.8 figures from the ledger, not estimates; cheaper models cost far less on the same split.
+
+| Split | Tasks | Cost/run | Who uses it |
+|-------|-------|----------|-------------|
+| `smoke` | 3, mock domain | ~$0.01 | Wiring check only |
+| `proxy` | 12, retail train | ~$3 | Early iterator runs |
+| `validation` | 35, retail train | ~$20 | Post-hoc overfitting check only |
+| `search_retail` / `_airline` / `_telecom` | 20 / 10 / 20 | — | What the reported iterator campaign optimized against |
+| `train_distill_retail` / `_airline` / `_telecom` | 27 / 20 / 49 | — | Opus teacher trajectories for fine-tuning |
+| `eval_airline` / `eval_telecom` | 10 / 25 | — | Arm D development eval |
+| `transfer_banking` | 30, banking_knowledge | — | Zero-shot transfer domain |
+| `test_retail` | 40, official test | $17.87 | Final reporting, run once |
+| `test_airline` | 20, official test | $9.29 | Final reporting, run once |
+| `test_telecom` | 40, official test | $30.56 | Final reporting, run once |
+
+The full four-system held-out sweep measured **$527.36 and 36.7 hours** of sequential wall clock.
 
 ---
 

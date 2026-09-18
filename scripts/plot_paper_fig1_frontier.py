@@ -25,7 +25,7 @@ PANELS = [("test_retail", "A", "Retail, 40 tasks"),
 
 SYSTEMS = [
     ("anthropic/claude-opus-4-8", "v0.1", "Opus 4.8, static harness", style.WARM_GRAY, "o"),
-    ("anthropic/claude-opus-4-8", "v0.4", "Opus 4.8 plus agent iterator", OCHRE, "s"),
+    ("anthropic/claude-opus-4-8", "v0.5", "Opus 4.8 plus agent iterator", OCHRE, "s"),
     ("openai/thinkingmachines/Inkling-Small", "v0.1", "Inkling-Small base", style.STEEL_BLUE, "o"),
     ("openai/armd-inkling-small-tuned", "v0.1", "Inkling-Small fine-tuned", style.TERRACOTTA, "D"),
 ]
@@ -55,9 +55,15 @@ def runs(split, model, harness):
     return out
 
 
+# Mean labels sit above or below the mark so neighbouring systems stay apart.
+LABEL_OFFSET = {"Opus 4.8, static harness": 15, "Opus 4.8 plus agent iterator": -23,
+                "Inkling-Small base": 15, "Inkling-Small fine-tuned": -23}
+
+
 def main() -> int:
     style.apply()
-    fig, axes = plt.subplots(1, 3, figsize=(13.0, 5.6), sharey=True)
+    style.readable()
+    fig, axes = plt.subplots(1, 3, figsize=(13.6, 6.1), sharey=True)
     fig.subplots_adjust(left=0.062, right=0.988, top=0.70, bottom=0.235, wspace=0.08)
 
     for ax, (split, letter, sub) in zip(axes, PANELS):
@@ -66,34 +72,34 @@ def main() -> int:
             if not pts:
                 continue
             xs, ys = [p[0] for p in pts], [p[1] for p in pts]
-            ax.scatter(xs, ys, s=26, color=colour, marker=marker, alpha=0.34,
+            ax.scatter(xs, ys, s=34, color=colour, marker=marker, alpha=0.34,
                        zorder=2, linewidth=0)
             mx, my = st.mean(xs), st.mean(ys)
             ax.errorbar(mx, my,
                         xerr=st.stdev(xs) if len(xs) > 1 else None,
                         yerr=st.stdev(ys) if len(ys) > 1 else None,
                         fmt="none", ecolor=colour, elinewidth=1.3, capsize=3.5, zorder=3)
-            ax.scatter(mx, my, s=96, color=colour, marker=marker, zorder=4,
-                       edgecolor=style.CREAM, linewidth=1.1)
-            ax.annotate(f"{my:.2f}", xy=(mx, my), xytext=(0, 12),
+            ax.scatter(mx, my, s=150, color=colour, marker=marker, zorder=4,
+                       edgecolor=style.CREAM, linewidth=1.2)
+            ax.annotate(f"{my:.2f}", xy=(mx, my), xytext=(0, LABEL_OFFSET[label]),
                         textcoords="offset points", ha="center",
-                        fontsize=8.8, color=style.MUTED)
+                        fontsize=11.5, color=colour, fontweight="bold")
         ax.set_xscale("log")
         ax.set_xlim(0.02, 3.0)
         ax.set_ylim(0.05, 1.02)
         style.horizontal_grid_only(ax)
-        ax.set_title(f"{letter}   {sub}", fontsize=10.5, color=style.INK,
+        ax.set_title(f"{letter}   {sub}", fontsize=12.5, color=style.INK,
                      fontweight="bold", loc="left", pad=10)
-        ax.set_xlabel("Cost per successful task, USD", fontsize=9)
+        ax.set_xlabel("Cost per successful task, USD, log scale", fontsize=11.5)
     axes[0].set_ylabel("Task success rate", labelpad=9)
 
-    style.titled(fig, 1, "Every seed run on the held-out test splits, four systems\ncompared")
+    style.titled(fig, None, "Every seed run on the held-out test splits, four systems\ncompared")
 
-    handles = [plt.Line2D([], [], color=c, marker=m, linestyle="none", markersize=8,
+    handles = [plt.Line2D([], [], color=c, marker=m, linestyle="none", markersize=11,
                           markeredgecolor=style.CREAM, label=lab)
                for _, _, lab, c, m in SYSTEMS]
     fig.legend(handles=handles, loc="lower center", ncol=4, frameon=False,
-               fontsize=9.4, bbox_to_anchor=(0.5, 0.032), columnspacing=2.2)
+               fontsize=12, bbox_to_anchor=(0.5, 0.028), columnspacing=2.4)
 
     pdf, png = style.save(fig, "fig1_test_all_runs_four_systems")
     print(f"wrote {pdf}\nwrote {png}")

@@ -722,6 +722,8 @@ The claim should be:
 
 ## 19. Editable and Forbidden Surfaces
 
+> **Superseded, 2026-09.** This section, and the editable-surface listing in §19, describe a planned layout that was never built. Many files named here do not exist, including `scripts/run_tau_test.py`, `scripts/run_transfer.py`, the `model_specialization/` package and most of the `target_agent/*.py` policy modules; the real specialization code is `arm_d/`, and the authoritative editable surface is `iterator_agent/allowed_edits.yaml`. For the layout as built see `README.md`. Kept for provenance.
+
 ### 19.1 Allowed Harness Editable Files
 
 The iterator agent may edit. The list below is the broad conceptual design space
@@ -897,6 +899,8 @@ notes
 ```
 
 ## 23. Repository Structure
+
+> **Superseded, 2026-09.** This section, and the editable-surface listing in §19, describe a planned layout that was never built. Many files named here do not exist, including `scripts/run_tau_test.py`, `scripts/run_transfer.py`, the `model_specialization/` package and most of the `target_agent/*.py` policy modules; the real specialization code is `arm_d/`, and the authoritative editable surface is `iterator_agent/allowed_edits.yaml`. For the layout as built see `README.md`. Kept for provenance.
 
 A possible repository structure:
 
