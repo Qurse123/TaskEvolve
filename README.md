@@ -12,6 +12,8 @@ Every reported number is a distribution over five fixed seeds rather than one ru
 the benchmark is stochastic: an LLM plays the customer. The headline metric is **cost per
 successful task**, which is agent inference cost divided by the number of tasks passed.
 
+Paper: [TaskEvolve.pdf](https://github.com/user-attachments/files/32667105/TaskEvolve.pdf)
+
 ---
 
 ## Headline result
